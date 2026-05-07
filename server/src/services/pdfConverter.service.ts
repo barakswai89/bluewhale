@@ -5,7 +5,7 @@
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 // @ts-ignore — pdf-parse v2 types may not resolve cleanly in all TS configs
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import pdfParse from 'pdf-parse';
 
 interface ConversionResult {
   success: boolean;
