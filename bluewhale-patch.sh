@@ -1,3 +1,28 @@
+#!/usr/bin/env bash
+# ============================================================
+# BlueWhale — PDF Converter + Report Scraper Cron Fix
+# Run from: /mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd/
+# ============================================================
+
+set -e  # Exit on any error
+
+SERVER_DIR="./server/src"
+SERVICES_DIR="$SERVER_DIR/services"
+JOBS_DIR="$SERVER_DIR/jobs"
+
+echo ""
+echo "🐋 BlueWhale Server Patch — Starting..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ── Backup existing files ────────────────────────────────────
+echo "📦 Backing up existing files..."
+cp "$SERVICES_DIR/pdfConverter.service.ts" "$SERVICES_DIR/pdfConverter.service.ts.bak" 2>/dev/null && echo "   ✅ Backed up pdfConverter.service.ts" || echo "   ⚠️  No existing pdfConverter to back up"
+cp "$JOBS_DIR/reportScraper.job.ts" "$JOBS_DIR/reportScraper.job.ts.bak" 2>/dev/null && echo "   ✅ Backed up reportScraper.job.ts" || echo "   ⚠️  No existing reportScraper.job to back up"
+
+# ── Write pdfConverter.service.ts ───────────────────────────
+echo ""
+echo "📝 Writing pdfConverter.service.ts..."
+cat > "$SERVICES_DIR/pdfConverter.service.ts" << 'PDFCONVERTER_EOF'
 // FILE: server/src/services/pdfConverter.service.ts
 // FIXED: Full PDF text extraction using pdf-parse + structured Excel/CSV output.
 // pdf-parse and xlsx are already in package.json — no install needed.
@@ -322,3 +347,212 @@ export async function extractTablesFromPDF(pdfUrl: string): Promise<string[][][]
     return [];
   }
 }
+PDFCONVERTER_EOF
+
+echo "   ✅ pdfConverter.service.ts written"
+
+# ── Write reportScraper.job.ts ───────────────────────────────
+echo ""
+echo "📝 Writing reportScraper.job.ts (with weekly cron)..."
+cat > "$JOBS_DIR/reportScraper.job.ts" << 'REPORTJOB_EOF'
+// FILE: server/src/jobs/reportScraper.job.ts
+// FIXED: Added weekly cron re-scrape so new published reports are picked up
+// automatically without needing a server restart.
+// node-cron is already in package.json — no install needed.
+
+import { PrismaClient } from '@prisma/client';
+import cron from 'node-cron';
+import { scrapeAllCompanyReports } from '../services/reportScraper.service';
+
+const prisma = new PrismaClient();
+
+// ── Core job logic ────────────────────────────────────────────────────────────
+export async function runReportScraperJob(): Promise<void> {
+  const startTime = Date.now();
+  console.log('\n📄 Report scraper job starting...');
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log('⚠️  Only real financial reports will be stored — NO MOCK DATA\n');
+
+  try {
+    // Fetch all active companies that have a website configured
+    const companies = await prisma.company.findMany({
+      where: {
+        isActive: true,
+        website: { not: null },
+      },
+      select: { id: true, ticker: true, name: true, website: true },
+    });
+
+    if (companies.length === 0) {
+      console.log('⚠️  No active companies with websites found — nothing to scrape.');
+      return;
+    }
+
+    console.log(`📋 Found ${companies.length} companies to scrape\n`);
+
+    // Run the scraper across all companies
+    const scrapedResults = await scrapeAllCompanyReports(
+      companies as Array<{ ticker: string; website: string; id: string; name: string }>
+    );
+
+    // Persist results to the database
+    let totalStored = 0;
+    let totalUpdated = 0;
+    let companiesWithReports = 0;
+    let companiesWithoutReports = 0;
+
+    for (const [companyId, reports] of scrapedResults.entries()) {
+      const company = companies.find(c => c.id === companyId);
+      const ticker = company?.ticker ?? 'UNKNOWN';
+
+      if (reports.length === 0) {
+        console.log(`⚠️  No real reports found for ${ticker} — skipping`);
+        companiesWithoutReports++;
+        continue;
+      }
+
+      companiesWithReports++;
+      console.log(`💾 Storing ${reports.length} reports for ${ticker}...`);
+
+      for (const report of reports) {
+        try {
+          const result = await prisma.companyReport.upsert({
+            where: {
+              companyId_title: { companyId, title: report.title },
+            },
+            create: {
+              companyId,
+              title: report.title,
+              reportType: report.type,
+              fiscalYear: report.date ? report.date.getFullYear() : new Date().getFullYear(),
+              publishDate: report.date ?? new Date(),
+              fileUrl: report.url,
+              fileName: report.url.split('/').pop() ?? 'report.pdf',
+              aiProcessed: false,
+            },
+            update: {
+              fileUrl: report.url,
+              reportType: report.type,
+              publishDate: report.date ?? new Date(),
+              updatedAt: new Date(),
+            },
+          });
+
+          // Determine if it was a create or update by checking createdAt vs updatedAt
+          const wasCreated =
+            Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 1000;
+          if (wasCreated) totalStored++;
+          else totalUpdated++;
+        } catch (err: any) {
+          console.error(`   ❌ Failed to store "${report.title}": ${err.message}`);
+        }
+      }
+
+      console.log(`   ✅ Done: ${ticker}`);
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    console.log('\n🎉 Report scraper job complete!');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`📊 New reports stored:      ${totalStored}`);
+    console.log(`🔄 Existing reports updated: ${totalUpdated}`);
+    console.log(`✅ Companies with reports:  ${companiesWithReports}/${companies.length}`);
+    console.log(`⚠️  Companies without reports: ${companiesWithoutReports}/${companies.length}`);
+    console.log(`⏱️  Elapsed: ${elapsed}s`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  } catch (error: any) {
+    console.error('❌ Report scraper job failed:', error.message);
+    throw error;
+  }
+}
+
+// ── Startup runner (fire-and-forget on server boot) ───────────────────────────
+function runOnStartup(): void {
+  console.log('\n📄 Running initial report scrape on startup...\n');
+  runReportScraperJob()
+    .then(() => console.log('✅ Startup report scrape complete\n'))
+    .catch(err => console.error('❌ Startup report scrape failed:', err.message, '\n'));
+}
+
+// ── Weekly cron — every Sunday at 2:00 AM ─────────────────────────────────────
+// Cron pattern: minute hour day-of-month month day-of-week
+// '0 2 * * 0' = 02:00 every Sunday
+function scheduleWeeklyScrape(): void {
+  const CRON_EXPRESSION = '0 2 * * 0';
+
+  cron.schedule(CRON_EXPRESSION, () => {
+    console.log('\n🔄 Weekly report scraper triggered (Sunday 02:00)...');
+    runReportScraperJob()
+      .then(() => console.log('✅ Weekly report scrape complete\n'))
+      .catch(err => console.error('❌ Weekly report scrape failed:', err.message, '\n'));
+  });
+
+  console.log('📅 Weekly report scraper scheduled — runs every Sunday at 02:00');
+}
+
+// ── Entry point called from server.ts ─────────────────────────────────────────
+export function startReportScraperJob(): void {
+  // 1. Run once immediately on startup to populate the DB
+  runOnStartup();
+
+  // 2. Schedule weekly re-scrape so newly published reports are picked up
+  scheduleWeeklyScrape();
+}
+REPORTJOB_EOF
+
+echo "   ✅ reportScraper.job.ts written"
+
+# ── Verify files written correctly ──────────────────────────
+echo ""
+echo "🔍 Verifying file sizes..."
+PDF_SIZE=$(wc -c < "$SERVICES_DIR/pdfConverter.service.ts")
+JOB_SIZE=$(wc -c < "$JOBS_DIR/reportScraper.job.ts")
+echo "   pdfConverter.service.ts  → ${PDF_SIZE} bytes"
+echo "   reportScraper.job.ts     → ${JOB_SIZE} bytes"
+
+if [ "$PDF_SIZE" -lt 500 ] || [ "$JOB_SIZE" -lt 500 ]; then
+  echo ""
+  echo "❌ ERROR: One or more files appear too small — write may have failed."
+  echo "   Restoring backups..."
+  cp "$SERVICES_DIR/pdfConverter.service.ts.bak" "$SERVICES_DIR/pdfConverter.service.ts" 2>/dev/null || true
+  cp "$JOBS_DIR/reportScraper.job.ts.bak" "$JOBS_DIR/reportScraper.job.ts" 2>/dev/null || true
+  exit 1
+fi
+
+# ── Confirm pdf-parse is in node_modules ────────────────────
+echo ""
+echo "📦 Checking pdf-parse in node_modules..."
+if [ -d "./server/node_modules/pdf-parse" ]; then
+  echo "   ✅ pdf-parse already installed"
+else
+  echo "   ⚠️  pdf-parse not found in node_modules — running npm install..."
+  cd ./server && npm install && cd ..
+  echo "   ✅ npm install complete"
+fi
+
+# ── Done ────────────────────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ All done! Summary:"
+echo ""
+echo "   📄 pdfConverter.service.ts"
+echo "      • PDF → downloads and streams real file"
+echo "      • PDF → Excel: extracts full text + detects"
+echo "        financial table sections into separate sheets"
+echo "      • PDF → CSV: exports primary financial table"
+echo "      • Handles scanned PDFs gracefully"
+echo ""
+echo "   🔄 reportScraper.job.ts"
+echo "      • Runs once on server startup (existing behaviour)"
+echo "      • NEW: weekly cron every Sunday at 02:00 AM"
+echo "        to pick up newly published reports automatically"
+echo ""
+echo "   🔒 Backups saved as:"
+echo "      • $SERVICES_DIR/pdfConverter.service.ts.bak"
+echo "      • $JOBS_DIR/reportScraper.job.ts.bak"
+echo ""
+echo "   ▶️  To apply: restart your server"
+echo "      npm run dev   (local)"
+echo "      git add -A && git commit -m 'fix: pdf converter + weekly scraper cron' && git push   (Railway)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
