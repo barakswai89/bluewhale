@@ -5,7 +5,8 @@
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 // @ts-ignore — pdf-parse v2 types may not resolve cleanly in all TS configs
-import pdfParse from 'pdf-parse';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfParse: (buf: Buffer, opts?: { max?: number }) => Promise<{ text: string; numpages: number; info: Record<string, any> }> = require('pdf-parse');
 
 interface ConversionResult {
   success: boolean;
