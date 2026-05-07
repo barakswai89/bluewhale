@@ -1,6 +1,8 @@
-import { syncJsePrices } from './services/priceSync';
-import syncRoutes from './routes/sync.routes';
-// server/src/server.ts
+// FILE: server/src/server.ts
+// ✅ FIX: Removed duplicate stray imports that appeared before this comment.
+// The original file had `import { syncJsePrices } from './services/priceSync'`
+// and `import syncRoutes from './routes/sync.routes'` at the very top before
+// the module comment, causing duplicate import compilation warnings/errors.
 
 import app from './app';
 import { env } from './config/env';
@@ -18,13 +20,10 @@ async function startServer() {
     console.log('✅ Database connected');
 
     // Start cron jobs
-    startSyncCron(); // Hourly price sync
-    startScraperCron(); // Daily SENS scraper (6 AM + 5 PM)
+    startSyncCron();        // Hourly price sync
+    startScraperCron();     // Daily SENS scraper (6 AM + 5 PM)
+    startReportScraperJob(); // Runs once on startup
 
-    // Start report scraper (runs once on startup)
-    startReportScraperJob();
-
-    // Start server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📍 Environment: ${env.NODE_ENV}`);
@@ -35,7 +34,6 @@ async function startServer() {
   }
 }
 
-// Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down gracefully...');
   await prisma.$disconnect();
