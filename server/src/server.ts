@@ -1,8 +1,8 @@
 // FILE: server/src/server.ts
-// ✅ FIX: Removed duplicate stray imports that appeared before this comment.
-// The original file had `import { syncJsePrices } from './services/priceSync'`
-// and `import syncRoutes from './routes/sync.routes'` at the very top before
-// the module comment, causing duplicate import compilation warnings/errors.
+// FIXED:
+//   1. Calls seedCompaniesIfEmpty() on startup — if DB has no companies,
+//      sync has nothing to update. Previously there was no seed at all.
+//   2. Removed duplicate stray imports that caused compilation warnings.
 
 import app from './app';
 import { env } from './config/env';
@@ -10,23 +10,27 @@ import { prisma } from './config/database';
 import { startSyncCron } from './jobs/syncCron';
 import { startScraperCron } from './jobs/scraper.cron';
 import { startReportScraperJob } from './jobs/reportScraper.job';
+import { seedCompaniesIfEmpty } from './services/sync.service';
 
 const PORT = env.PORT || 5000;
 
 async function startServer() {
   try {
-    // Test database connection
     await prisma.$connect();
     console.log('✅ Database connected');
 
-    // Start cron jobs
-    startSyncCron();        // Hourly price sync
-    startScraperCron();     // Daily SENS scraper (6 AM + 5 PM)
-    startReportScraperJob(); // Runs once on startup
+    // Seed companies BEFORE starting sync cron
+    await seedCompaniesIfEmpty();
+
+    startSyncCron();
+    startScraperCron();
+    startReportScraperJob();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`\n🚀 BlueWhale API running on http://localhost:${PORT}`);
       console.log(`📍 Environment: ${env.NODE_ENV}`);
+      console.log(`💰 FMP key:     ${env.FMP_API_KEY ? '✅ set' : '❌ MISSING'}`);
+      console.log(`🤖 Anthropic:   ${env.ANTHROPIC_API_KEY ? '✅ set' : '❌ MISSING'}\n`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -34,16 +38,7 @@ async function startServer() {
   }
 }
 
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
+process.on('SIGINT',  async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
 
 startServer();

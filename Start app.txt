@@ -31,8 +31,7 @@ npm run dev
      git push
 
 NEXT TO DO LIST
-Code is already pushed to github see text file attached of my terminal.  
-Git URL :https://github.com/Barakansanya/bluewhale 
+Now that the Dashboard and Company Profile frontend is in place, let's ensure all prices and figures are pulling correctly from the FMP API — currently every value is displaying as zero.
+Please do a full scan of the entire app to identify every point where mock or placeholder data is being used, and replace it all with live API data. The goal is a fully functional application with real data throughout — no exceptions.
+Once this is fixed and verified, we'll move on to the next item on the list
 
-My railway URL: https://bluewhale-production.up.railway.app
- 
