@@ -197,9 +197,8 @@ async function syncMetrics(ticker: string, companyId: string): Promise<boolean> 
     const pct = (v: any) => (v != null && !isNaN(Number(v)) ? Number(v) * 100 : null);
 
     // ✅ FIX: use prisma.companyMetrics directly (not (prisma as any).companyMetrics)
-    await prisma.companyMetrics.upsert({
-      where: { companyId_asOfDate: { companyId, asOfDate: new Date(new Date().toDateString()) } },
-      update: {
+    const _existingMetrics = await prisma.companyMetrics.findFirst({ where: { companyId } });
+    const _metricsData = {
         // Valuation (from ratios)
         peRatio:          n(ratios?.priceEarningsRatio),
         pbRatio:          n(ratios?.priceToBookRatio),
@@ -220,27 +219,12 @@ async function syncMetrics(ticker: string, companyId: string): Promise<boolean> 
         dividendYield:    pct(ratios?.dividendYield),
         payoutRatio:      pct(ratios?.payoutRatio),
         updatedAt:        new Date(),
-      },
-      create: {
-        companyId,
-        asOfDate:         new Date(new Date().toDateString()),
-        peRatio:          n(ratios?.priceEarningsRatio),
-        pbRatio:          n(ratios?.priceToBookRatio),
-        psRatio:          n(ratios?.priceToSalesRatio),
-        evToEbitda:       n(keyMetrics?.enterpriseValueOverEBITDA),
-        grossMargin:      pct(ratios?.grossProfitMargin),
-        operatingMargin:  pct(ratios?.operatingProfitMargin),
-        netMargin:        pct(ratios?.netProfitMargin),
-        roe:              pct(ratios?.returnOnEquity),
-        roa:              pct(ratios?.returnOnAssets),
-        roic:             pct(ratios?.returnOnCapitalEmployed),
-        currentRatio:     n(ratios?.currentRatio),
-        quickRatio:       n(ratios?.quickRatio),
-        debtToEquity:     n(ratios?.debtEquityRatio),
-        dividendYield:    pct(ratios?.dividendYield),
-        payoutRatio:      pct(ratios?.payoutRatio),
-      },
-    });
+    };
+    if (_existingMetrics) {
+      await prisma.companyMetrics.update({ where: { id: _existingMetrics.id }, data: _metricsData });
+    } else {
+      await prisma.companyMetrics.create({ data: { companyId, asOfDate: new Date(new Date().toDateString()), ..._metricsData } });
+    }
 
     return true;
   } catch (err: any) {
