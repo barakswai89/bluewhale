@@ -114,58 +114,41 @@ export async function syncPrices(): Promise<{ updated: number; failed: number; s
 
   console.log(`💰 Syncing prices for ${companies.length} companies...`);
 
-  // ✅ FIX: Use .JO suffix for all JSE tickers
-  const symbols = companies.map(c => `${c.ticker}.JO`).join(',');
-  let quotes: any[] = [];
-
-  try {
-    const url = `${FMP}/quote/${symbols}?apikey=${key}`;
-    const { data } = await axios.get(url, { timeout: 30000 });
-    quotes = Array.isArray(data) ? data : [];
-  } catch (err: any) {
-    // If batch fails, FMP may have rejected the request — log and return
-    console.error('❌ syncPrices batch request failed:', err.message);
-    return { updated: 0, failed: companies.length, skipped: 0 };
-  }
-
-  // Build a lookup map: MTN.JO → quote
-  const quoteMap = new Map<string, any>();
-  for (const q of quotes) {
-    quoteMap.set(q.symbol, q);
-  }
-
+  // FMP free plan does not support batch quotes for JSE stocks — use individual requests
   let updated = 0, failed = 0, skipped = 0;
 
   for (const company of companies) {
     const symbol = `${company.ticker}.JO`;
-    const q = quoteMap.get(symbol);
-
-    if (!q || !q.price) {
-      console.warn(`⚠️  ${company.ticker}: no quote data from FMP`);
-      skipped++;
-      continue;
-    }
-
     try {
-      // ✅ FIX: priceChange field was previously missing from every update
-      await prisma.company.update({
-        where: { id: company.id },
-        data: {
-          lastPrice:           q.price              ?? company.lastPrice,
-          priceChange:         q.change             ?? 0,
-          priceChangePercent:  q.changesPercentage  ?? 0,
-          volume:              q.volume             ?? null,
-          marketCap:           q.marketCap          ?? null,
-          lastScrapedAt:       new Date(),
-          updatedAt:           new Date(),
-        },
-      });
-      console.log(`✅ ${company.ticker}: R${q.price} (${q.changesPercentage?.toFixed(2)}%)`);
-      updated++;
+      const url = `${FMP}/quote/${symbol}?apikey=${key}`;
+      const { data } = await axios.get(url, { timeout: 10000 });
+      const q = Array.isArray(data) ? data[0] : null;
+
+      if (!q || !q.price) {
+        console.warn(`⚠️  ${company.ticker}: no quote data from FMP`);
+        skipped++;
+      } else {
+        await prisma.company.update({
+          where: { id: company.id },
+          data: {
+            lastPrice:          q.price             ?? company.lastPrice,
+            priceChange:        q.change            ?? 0,
+            priceChangePercent: q.changesPercentage ?? 0,
+            volume:             q.volume            ?? null,
+            marketCap:          q.marketCap         ?? null,
+            lastScrapedAt:      new Date(),
+            updatedAt:          new Date(),
+          },
+        });
+        console.log(`✅ ${company.ticker}: R${q.price} (${q.changesPercentage?.toFixed(2)}%)`);
+        updated++;
+      }
     } catch (err: any) {
-      console.error(`❌ ${company.ticker} DB update failed:`, err.message);
+      console.error(`❌ ${company.ticker} failed:`, err.message);
       failed++;
     }
+    // Rate limit: FMP free = ~10 req/min — 350ms between calls stays safely under
+    await delay(350);
   }
 
   console.log(`💰 Price sync done — updated: ${updated}, skipped: ${skipped}, failed: ${failed}`);
