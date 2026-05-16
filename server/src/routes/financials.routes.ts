@@ -1,6 +1,6 @@
 // FILE: server/src/routes/financials.routes.ts
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware';
 import {
   getFinancials,
   downloadFinancials,
@@ -12,7 +12,7 @@ import {
 const router = Router();
 
 // All routes require auth
-router.use(authMiddleware);
+router.use(authenticate);
 
 router.get('/:ticker',          getFinancials);
 router.get('/:ticker/summary',  getFinancialsSummary);

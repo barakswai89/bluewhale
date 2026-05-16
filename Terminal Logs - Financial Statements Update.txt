@@ -1,0 +1,304 @@
+Bash Command:
+cd /mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd && bash bluewhale-financials.sh
+
+
+TERMINAL LOG:
+barak@DESKTOP-O6QFNNI:/mnt/c/Windows/system32$ cd /mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd && bash bluewhale-financials.sh
+
+🐋 BlueWhale Financial Statements — Building standalone feature...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📐 Adding FinancialStatement model to schema.prisma...
+   ℹ️  FinancialStatement model already in schema.prisma
+🗄️  Creating migration SQL...
+   ✅ Migration SQL created
+📝 Writing financials.service.ts...
+   ✅ financials.service.ts written
+📝 Writing financials.controller.ts...
+   ✅ financials.controller.ts written
+📝 Writing financials.routes.ts...
+   ✅ financials.routes.ts written
+📝 Registering financials route in app.ts...
+   ✅ financials route registered in app.ts
+📝 Writing financials.job.ts...
+   ✅ financials.job.ts written
+📝 Adding financials job to server.ts...
+   ✅ startFinancialsJob added to server.ts
+📝 Writing FinancialsTab.tsx...
+   ✅ FinancialsTab.tsx written
+📝 Adding Financials tab to CompanyProfilePage.tsx...
+   ✅ Financials tab added to CompanyProfilePage.tsx
+
+🚀 Committing and pushing...
+[main f9dbeca] feat: standalone financial statements — Income Statement, Balance Sheet, Cash Flow (NFLX template)
+ 10 files changed, 2301 insertions(+), 1 deletion(-)
+ create mode 100644 bluewhale-financials.sh
+ create mode 100644 client/src/components/FinancialsTab.tsx
+ create mode 100644 server/prisma/migrations/20260509000001_add_financial_statements/migration.sql
+ create mode 100644 server/src/controllers/financials.controller.ts
+ create mode 100644 server/src/jobs/financials.job.ts
+ create mode 100644 server/src/routes/financials.routes.ts
+ create mode 100644 server/src/services/financials.service.ts
+Enumerating objects: 41, done.
+Counting objects: 100% (41/41), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (24/24), done.
+Writing objects: 100% (25/25), 27.20 KiB | 296.00 KiB/s, done.
+Total 25 (delta 15), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (15/15), completed with 15 local objects.
+To github.com:Barakansanya/bluewhale.git
+   55273c6..f9dbeca  main -> main
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+barak@DESKTOP-O6QFNNI:/mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd$
+
+
+RAILWAY LOG:
+2026-05-15T08:35:38.464352690Z [inf]  scheduling build on Metal builder "builder-negfks"
+2026-05-15T08:35:38.778798474Z [inf]  uploading snapshot
+2026-05-15T08:35:39.045876246Z [inf]  fetched snapshot sha256:c5d7f090208fd3a81b14e3be3c942c48a9276763f44a77d402ae5f06b83f1a1b (601 kB bytes)
+2026-05-15T08:35:39.046010007Z [inf]  fetching snapshot
+2026-05-15T08:35:39.256236329Z [inf]  added file: server/prisma/migrations/20260509000001_add_financial_statements/migration.sql
+2026-05-15T08:35:39.446536705Z [inf]  unpacking archive
+2026-05-15T08:35:39.665305173Z [inf]  using build driver railpack-v0.23.0
+2026-05-15T08:35:39.869217812Z [err]   INFO No package manager inferred, using npm default
+2026-05-15T08:35:39.953459678Z [inf]                     
+2026-05-15T08:35:39.953465016Z [inf]  [38;2;125;86;243m╭─────────────────╮[0m
+2026-05-15T08:35:39.953466278Z [inf]  [38;2;125;86;243m│[0m Railpack 0.23.0 [38;2;125;86;243m│[0m
+2026-05-15T08:35:39.953467340Z [inf]  [38;2;125;86;243m╰─────────────────╯[0m
+2026-05-15T08:35:39.953468031Z [inf]  
+2026-05-15T08:35:39.953469864Z [inf]    [97m↳ Detected Node[0m
+2026-05-15T08:35:39.953471246Z [inf]    [97m↳ Using npm package manager[0m
+2026-05-15T08:35:39.953474050Z [inf]              
+2026-05-15T08:35:39.953474871Z [inf]    [1mPackages[0m  
+2026-05-15T08:35:39.953475742Z [inf]    [38;5;238m──────────[0m
+2026-05-15T08:35:39.953477926Z [inf]    [95mnode[0m  [38;5;238m│[0m  [96m20.20.2[0m  [38;5;238m│[0m  package.json > engines > node (>=20.0.0)
+2026-05-15T08:35:39.953478697Z [inf]              
+2026-05-15T08:35:39.953479458Z [inf]    [1mSteps[0m     
+2026-05-15T08:35:39.953480630Z [inf]    [38;5;238m──────────[0m
+2026-05-15T08:35:39.953481401Z [inf]    [95m▸ install[0m
+2026-05-15T08:35:39.953482383Z [inf]      [38;5;245m$[0m [1mnpm ci[0m
+2026-05-15T08:35:39.953484415Z [inf]           
+2026-05-15T08:35:39.953485217Z [inf]    [95m▸ build[0m
+2026-05-15T08:35:39.953486058Z [inf]      [38;5;245m$[0m [1mnpx prisma generate && npm run build[0m
+2026-05-15T08:35:39.953486749Z [inf]              
+2026-05-15T08:35:39.953487380Z [inf]    [1mDeploy[0m    
+2026-05-15T08:35:39.953488151Z [inf]    [38;5;238m──────────[0m
+2026-05-15T08:35:39.953489002Z [inf]      [38;5;245m$[0m [1mnpx prisma migrate deploy && npm start[0m
+2026-05-15T08:35:39.953489633Z [inf]  
+2026-05-15T08:35:40.130588251Z [inf]  resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0
+2026-05-15T08:35:40.206926328Z [inf]  resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0
+2026-05-15T08:35:40.207259237Z [inf]  docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6
+2026-05-15T08:35:40.207568902Z [inf]  docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6
+2026-05-15T08:35:40.220268396Z [inf]  docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6
+2026-05-15T08:35:40.220673524Z [inf]  docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6
+2026-05-15T08:35:40.408226027Z [inf]  load build definition from ./railpack-plan.json
+2026-05-15T08:35:40.408527779Z [inf]  load build definition from ./railpack-plan.json
+2026-05-15T08:35:40.409050153Z [inf]  load build definition from ./railpack-plan.json
+2026-05-15T08:35:40.515409735Z [inf]  load build definition from ./railpack-plan.json
+2026-05-15T08:35:40.597217568Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:40.597219301Z [inf]  copy /root/.local/state/mise
+2026-05-15T08:35:40.597219732Z [inf]  copy /etc/mise/config.toml
+2026-05-15T08:35:40.597220343Z [inf]  copy /usr/local/bin/mise
+2026-05-15T08:35:40.597220773Z [inf]  copy /mise/installs
+2026-05-15T08:35:40.597221294Z [inf]  [railpack] copy secrets hash
+2026-05-15T08:35:40.597221705Z [inf]  install mise packages: node
+2026-05-15T08:35:40.597222105Z [inf]  create mise config
+2026-05-15T08:35:40.597222616Z [inf]  mkdir /etc/mise
+2026-05-15T08:35:40.597223107Z [inf]  docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.17
+2026-05-15T08:35:40.597223507Z [inf]  install apt packages: libatomic1
+2026-05-15T08:35:40.597223878Z [inf]  [railpack] secrets hash
+2026-05-15T08:35:40.597225991Z [inf]  docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17
+2026-05-15T08:35:40.597226442Z [inf]  copy /mise/shims
+2026-05-15T08:35:40.597229326Z [inf]  [railpack] hash used secrets
+2026-05-15T08:35:40.597279051Z [inf]  copy /root/.cache
+2026-05-15T08:35:40.597279552Z [inf]  copy /app/node_modules
+2026-05-15T08:35:40.597280072Z [inf]  npx prisma generate && npm run build
+2026-05-15T08:35:40.597280473Z [inf]  copy .
+2026-05-15T08:35:40.597280854Z [inf]  copy / /app
+2026-05-15T08:35:40.597281224Z [inf]  [railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+2026-05-15T08:35:40.597281624Z [inf]  copy prisma
+2026-05-15T08:35:40.597282005Z [inf]  copy package.json
+2026-05-15T08:35:40.597282376Z [inf]  copy package-lock.json
+2026-05-15T08:35:40.597282776Z [inf]  loading .
+2026-05-15T08:35:40.597283157Z [inf]  mkdir -p /app/node_modules/.cache
+2026-05-15T08:35:40.597283547Z [inf]  copy /app
+2026-05-15T08:35:40.597283918Z [inf]  [railpack] copy used secrets hash
+2026-05-15T08:35:40.597284299Z [inf]  npm ci
+2026-05-15T08:35:40.598238720Z [inf]  docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17
+2026-05-15T08:35:40.598240694Z [inf]  [railpack] secrets hash
+2026-05-15T08:35:40.598241595Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:40.598242286Z [inf]  loading .
+2026-05-15T08:35:40.598243007Z [inf]  docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.17
+2026-05-15T08:35:40.598257809Z [inf]  loading .
+2026-05-15T08:35:40.717429784Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:40.717938878Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:40.718099599Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:40.733992304Z [inf]  loading .
+2026-05-15T08:35:40.734006075Z [inf]  [railpack] secrets hash
+2026-05-15T08:35:40.737147488Z [inf]  docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17
+2026-05-15T08:35:40.752027805Z [inf]  docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17
+2026-05-15T08:35:40.752196147Z [inf]  install apt packages: libatomic1
+2026-05-15T08:35:40.876389136Z [inf]  docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.17
+2026-05-15T08:35:40.927794674Z [inf]  [railpack] secrets hash
+2026-05-15T08:35:40.992390934Z [inf]  loading .
+2026-05-15T08:35:41.085379473Z [inf]  mkdir /etc/mise
+2026-05-15T08:35:41.085381506Z [inf]  create mise config
+2026-05-15T08:35:41.085382488Z [inf]  install mise packages: node
+2026-05-15T08:35:41.085456169Z [inf]  install mise packages: node
+2026-05-15T08:35:41.085457270Z [inf]  copy /mise/shims
+2026-05-15T08:35:41.085458051Z [inf]  copy /mise/installs
+2026-05-15T08:35:41.085458802Z [inf]  copy /usr/local/bin/mise
+2026-05-15T08:35:41.085459523Z [inf]  copy /etc/mise/config.toml
+2026-05-15T08:35:41.085460255Z [inf]  copy /root/.local/state/mise
+2026-05-15T08:35:41.085539774Z [inf]  copy /root/.local/state/mise
+2026-05-15T08:35:41.125549394Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:41.286059192Z [inf]  [railpack] loading secrets
+2026-05-15T08:35:41.294880588Z [inf]  [railpack] copy secrets hash
+2026-05-15T08:35:41.412293814Z [inf]  [railpack] copy secrets hash
+2026-05-15T08:35:41.452217264Z [inf]  [railpack] hash used secrets
+2026-05-15T08:35:41.544531292Z [inf]  Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+
+2026-05-15T08:35:41.579765647Z [inf]  Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+
+2026-05-15T08:35:41.713167402Z [inf]  Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8792 kB]
+
+2026-05-15T08:35:41.772560325Z [inf]  [railpack] hash used secrets
+2026-05-15T08:35:41.810056694Z [inf]  Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+
+2026-05-15T08:35:41.816358129Z [inf]  [railpack] copy used secrets hash
+2026-05-15T08:35:41.817483808Z [inf]  mkdir -p /app/node_modules/.cache
+2026-05-15T08:35:41.893879251Z [inf]  Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [305 kB]
+
+2026-05-15T08:35:42.300834795Z [inf]  mkdir -p /app/node_modules/.cache
+2026-05-15T08:35:42.319540751Z [inf]  copy package-lock.json
+2026-05-15T08:35:42.611615117Z [inf]  copy package-lock.json
+2026-05-15T08:35:42.619549592Z [inf]  Fetched 9358 kB in 1s (8542 kB/s)
+Reading package lists...
+2026-05-15T08:35:42.646085807Z [inf]  copy package.json
+2026-05-15T08:35:42.907753852Z [inf]  copy package.json
+2026-05-15T08:35:42.944418413Z [inf]  copy prisma
+2026-05-15T08:35:43.091280915Z [inf]  
+2026-05-15T08:35:43.168227555Z [inf]  Reading package lists...
+2026-05-15T08:35:43.347120284Z [inf]  copy prisma
+2026-05-15T08:35:43.415458048Z [inf]  npm ci
+2026-05-15T08:35:43.63362236Z [inf]  
+2026-05-15T08:35:43.64897806Z [inf]  Building dependency tree...
+2026-05-15T08:35:43.783019695Z [inf]  
+Reading state information...
+
+2026-05-15T08:35:43.928076558Z [inf]  The following NEW packages will be installed:
+
+2026-05-15T08:35:43.929250689Z [inf]    libatomic1
+
+2026-05-15T08:35:43.960625934Z [inf]  0 upgraded, 1 newly installed, 0 to remove and 2 not upgraded.
+Need to get 9376 B of archives.
+After this operation, 46.1 kB of additional disk space will be used.
+Get:1 http://deb.debian.org/debian bookworm/main amd64 libatomic1 amd64 12.2.0-14+deb12u1 [9376 B]
+
+2026-05-15T08:35:44.229018789Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2026-05-15T08:35:44.256306001Z [inf]  debconf: delaying package configuration, since apt-utils is not installed
+
+2026-05-15T08:35:44.309299131Z [inf]  Fetched 9376 B in 0s (437 kB/s)
+
+2026-05-15T08:35:44.344365845Z [inf]  Selecting previously unselected package libatomic1:amd64.
+(Reading database ... 
+2026-05-15T08:35:44.347226798Z [inf]  (Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+2026-05-15T08:35:44.353969304Z [inf]  (Reading database ... 75%
+2026-05-15T08:35:44.357250016Z [inf]  (Reading database ... 80%
+2026-05-15T08:35:44.361025401Z [inf]  (Reading database ... 85%
+2026-05-15T08:35:44.365182048Z [inf]  (Reading database ... 90%
+2026-05-15T08:35:44.369920627Z [inf]  (Reading database ... 95%
+2026-05-15T08:35:44.376336985Z [inf]  (Reading database ... 100%
+(Reading database ... 6623 files and directories currently installed.)
+
+2026-05-15T08:35:44.377147841Z [inf]  Preparing to unpack .../libatomic1_12.2.0-14+deb12u1_amd64.deb ...
+
+2026-05-15T08:35:44.400658897Z [inf]  Unpacking libatomic1:amd64 (12.2.0-14+deb12u1) ...
+
+2026-05-15T08:35:44.461125481Z [inf]  Setting up libatomic1:amd64 (12.2.0-14+deb12u1) ...
+
+2026-05-15T08:35:44.467490801Z [inf]  Processing triggers for libc-bin (2.36-9+deb12u13) ...
+
+2026-05-15T08:35:44.835851958Z [inf]  install apt packages: libatomic1
+2026-05-15T08:35:46.588151586Z [inf]  npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+
+2026-05-15T08:35:46.752591571Z [inf]  npm warn deprecated npmlog@5.0.1: This package is no longer supported.
+
+2026-05-15T08:35:47.145803173Z [inf]  npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+
+2026-05-15T08:35:47.304964227Z [inf]  npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+
+2026-05-15T08:35:47.522057623Z [inf]  npm warn deprecated gauge@3.0.2: This package is no longer supported.
+
+2026-05-15T08:35:47.682820741Z [inf]  npm warn deprecated are-we-there-yet@2.0.0: This package is no longer supported.
+
+2026-05-15T08:35:48.087489463Z [inf]  npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+
+2026-05-15T08:35:48.129914417Z [inf]  npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+
+2026-05-15T08:35:49.840370174Z [inf]  npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+2026-05-15T08:35:52.962931234Z [inf]  
+added 588 packages, and audited 589 packages in 9s
+
+2026-05-15T08:35:52.98495574Z [inf]  
+18 vulnerabilities (1 low, 5 moderate, 12 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+
+2026-05-15T08:35:53.665716458Z [inf]  npm ci
+2026-05-15T08:35:53.683311337Z [inf]  copy / /app
+2026-05-15T08:35:54.273323778Z [inf]  copy / /app
+2026-05-15T08:35:54.313250254Z [inf]  copy .
+2026-05-15T08:35:55.072481119Z [inf]  copy .
+2026-05-15T08:35:55.110576868Z [inf]  npx prisma generate && npm run build
+2026-05-15T08:35:55.957480296Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2026-05-15T08:35:56.620236841Z [inf]  Prisma schema loaded from prisma/schema.prisma
+
+2026-05-15T08:35:57.256010752Z [inf]  
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 280ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+2026-05-15T08:35:57.632454877Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2026-05-15T08:35:57.655767925Z [inf]  
+> bluewhale-server@1.0.0 build
+> tsc
+
+
+2026-05-15T08:36:00.000440156Z [inf]  src/routes/financials.routes.ts(3,10): error TS2305: Module '"../middleware/auth.middleware"' has no exported member 'authMiddleware'.
+
+2026-05-15T08:36:00.696276475Z [err]  npx prisma generate && npm run build
+2026-05-15T08:36:00.807004961Z [err]  Build Failed: build daemon returned an error < failed to solve: process "sh -c npx prisma generate && npm run build" did not complete successfully: exit code: 2 >
+
