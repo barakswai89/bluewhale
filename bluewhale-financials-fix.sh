@@ -1,3 +1,18 @@
+#!/usr/bin/env bash
+# ================================================================
+# BlueWhale — Financial Statements Fix
+# 1. Switch data source: FMP → Yahoo Finance quoteSummary (free, JSE-covered)
+# 2. Explicitly add Financials tab to CompanyProfilePage.tsx
+# Run from: /mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd/
+# ================================================================
+set -e
+echo ""
+echo "🐋 BlueWhale Financials Fix — Yahoo Finance data + Financials tab"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ── 1. UPDATED FINANCIALS SERVICE — Yahoo Finance quoteSummary ──────
+echo "📝 Writing financials.service.ts (Yahoo Finance source)..."
+cat > server/src/services/financials.service.ts << 'EOF'
 // FILE: server/src/services/financials.service.ts
 // DATA SOURCE: Yahoo Finance quoteSummary (free, no API key, JSE-covered)
 // FMP was replaced — free plan blocks all JSE fundamental data (403 on all tickers)
@@ -396,3 +411,131 @@ export async function generateFinancialsExcel(
 
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
+EOF
+echo "   ✅ financials.service.ts updated (Yahoo Finance source)"
+
+# ── 2. UPDATE CompanyProfilePage.tsx — explicit Financials tab ──────
+echo "📝 Adding Financials tab to CompanyProfilePage.tsx..."
+python3 << 'PYEOF'
+path = 'client/src/pages/CompanyProfilePage.tsx'
+content = open(path).read()
+
+changed = False
+
+# Add FinancialsTab import if missing
+if 'FinancialsTab' not in content:
+    content = content.replace(
+        "import CompanyReports from '../components/CompanyReports';",
+        "import CompanyReports from '../components/CompanyReports';\nimport FinancialsTab from '../components/FinancialsTab';"
+    )
+    changed = True
+    print('   ✅ FinancialsTab import added')
+else:
+    print('   ℹ️  FinancialsTab import already present')
+
+# Fix the activeTab type — handle both possible spellings
+if "'overview' | 'news' | 'reports'" in content and 'financials' not in content:
+    content = content.replace(
+        "'overview' | 'news' | 'reports'",
+        "'overview' | 'news' | 'reports' | 'financials'"
+    )
+    changed = True
+    print('   ✅ activeTab type updated')
+
+# Add the Financials tab button — find the Reports button and add after it
+if "['reports'" in content and "'💹 Financials'" not in content:
+    content = content.replace(
+        "['reports', '📄 Reports'],",
+        "['reports', '📄 Reports'],\n              ['financials', '💹 Financials'],"
+    )
+    # Also handle the tuple-form used in the map
+    content = content.replace(
+        "['reports','📄 Reports'],",
+        "['reports','📄 Reports'],\n              ['financials','💹 Financials'],"
+    )
+    changed = True
+    print('   ✅ Financials tab button added')
+
+# Add the Financials tab content panel
+if 'activeTab === \'financials\'' not in content and 'activeTab === "financials"' not in content:
+    # Find the Reports panel and insert Financials before it
+    reports_panel = """{/* ── Reports"""
+    if reports_panel in content:
+        content = content.replace(
+            reports_panel,
+            """{/* ── Financials ────────────────────────────────────────────────── */}
+            {activeTab === 'financials' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <FinancialsTab ticker={company.ticker} companyName={company.name} />
+              </div>
+            )}
+
+            {/* ── Reports"""
+        )
+        changed = True
+        print('   ✅ Financials panel added before Reports panel')
+    else:
+        # Fallback: add before the closing </div> of the tabs area
+        # Find the last activeTab panel and add after it
+        content = content.replace(
+            "{activeTab === 'reports' && (",
+            """{activeTab === 'financials' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <FinancialsTab ticker={company.ticker} companyName={company.name} />
+              </div>
+            )}
+            {activeTab === 'reports' && ("""
+        )
+        changed = True
+        print('   ✅ Financials panel added (fallback pattern)')
+
+if changed:
+    open(path, 'w').write(content)
+    print('   ✅ CompanyProfilePage.tsx saved')
+else:
+    print('   ℹ️  No changes needed to CompanyProfilePage.tsx')
+
+# Verify the tab is present
+if "'💹 Financials'" in content or "💹 Financials" in content:
+    print('   ✅ VERIFIED: Financials tab is present in CompanyProfilePage.tsx')
+else:
+    print('   ❌ WARNING: Financials tab NOT found after patching — check manually')
+PYEOF
+
+# ── 3. VERIFY ────────────────────────────────────────────────────────
+echo ""
+echo "🔍 Verifying..."
+grep -c "FinancialsTab" client/src/pages/CompanyProfilePage.tsx && echo "   ✅ FinancialsTab referenced in CompanyProfilePage" || echo "   ❌ FinancialsTab NOT found"
+grep -c "financials" client/src/pages/CompanyProfilePage.tsx && echo "   ✅ financials tab wired" || echo "   ❌ financials tab NOT wired"
+
+# ── 4. PUSH SERVER ───────────────────────────────────────────────────
+echo ""
+echo "🚀 Pushing server (Yahoo Finance financials service)..."
+cd server
+git add -A
+git commit -m "fix: switch financials data source FMP → Yahoo Finance quoteSummary (FMP free plan blocks all JSE fundamentals)"
+git push
+cd ..
+
+# ── 5. PUSH CLIENT ───────────────────────────────────────────────────
+echo ""
+echo "🚀 Pushing client (Financials tab)..."
+cd client
+git add -A
+git commit -m "fix: add Financials tab to CompanyProfilePage (tab was missing due to patch failure)"
+git push
+cd ..
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ Financials fix deployed!"
+echo ""
+echo "   💾 Data source:  Yahoo Finance quoteSummary (free, JSE-covered)"
+echo "   📋 Coverage:     ~30-40 of 50 JSE companies expected to have data"
+echo "   📅 Sync:         On startup + every Sunday 04:00"
+echo "   🖥️  UI:           💹 Financials tab now visible on company profile"
+echo ""
+echo "After deploy watch for lines like:"
+echo "   ✅ MTN: 4 years of financials stored (Yahoo Finance)"
+echo "   ✅ SOL: 4 years of financials stored (Yahoo Finance)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

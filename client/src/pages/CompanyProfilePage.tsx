@@ -490,6 +490,11 @@ export default function CompanyProfilePage() {
             )}
 
             {/* Reports */}
+            {activeTab === 'financials' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <FinancialsTab ticker={company.ticker} companyName={company.name} />
+              </div>
+            )}
             {activeTab === 'reports' && (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                 <CompanyReports ticker={company.ticker} />
