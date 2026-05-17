@@ -37,7 +37,6 @@ function mapIS(d: any, fy: number) {
   const ni  = raw(d.netIncome);
   const ebitda = raw(d.ebitda);
   return {
-    fiscalYear:          fy,
     totalRevenues:       rev,
     costOfRevenues:      raw(d.costOfRevenue),
     grossProfit:         gp,
