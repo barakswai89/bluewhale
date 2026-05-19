@@ -197,7 +197,7 @@ export async function syncAllFinancials(): Promise<void> {
   let success = 0, failed = 0;
 
   for (const c of companies) {
-    await DELAY(800); // Respect Yahoo rate limits
+    await DELAY(1500); // Respect Yahoo rate limits
     const result = await syncCompanyFinancials(c.ticker, c.id);
     if (result.stored > 0) success++;
     else failed++;
