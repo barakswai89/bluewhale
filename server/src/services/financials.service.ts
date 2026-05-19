@@ -4,7 +4,8 @@
 //      because Yahoo requires crumb/cookie authentication.
 //      yahoo-finance2 handles crumb auth automatically and is actively maintained.
 
-import yahooFinance from 'yahoo-finance2';
+import * as yahooFinanceModule from "yahoo-finance2";
+const yahooFinance = (yahooFinanceModule as any).default ?? yahooFinanceModule;
 import * as XLSX from 'xlsx';
 import { prisma } from '../config/database';
 
