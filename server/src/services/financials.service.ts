@@ -37,7 +37,7 @@ export async function syncCompanyFinancials(
         'balanceSheetHistory',
         'cashflowStatementHistory',
       ],
-    });
+    }) as any;
 
     const isRows = result.incomeStatementHistory?.incomeStatementHistory ?? [];
     const bsRows = result.balanceSheetHistory?.balanceSheetHistory ?? [];
@@ -164,7 +164,7 @@ export async function syncCompanyFinancials(
           where:  { companyId_fiscalYear_period: { companyId, fiscalYear, period: 'annual' } },
           update: data,
           create: data,
-        });
+        }) as any;
         stored++;
       } catch (err: any) {
         console.warn(`   ⚠️  ${ticker} FY${fiscalYear} upsert failed: ${err.message}`);
@@ -191,7 +191,7 @@ export async function syncAllFinancials(): Promise<void> {
   const companies = await prisma.company.findMany({
     where:  { isActive: true },
     select: { id: true, ticker: true },
-  });
+  }) as any;
 
   console.log(`\n📊 Syncing financials for ${companies.length} companies (yahoo-finance2)...`);
   let success = 0, failed = 0;
@@ -208,13 +208,13 @@ export async function syncAllFinancials(): Promise<void> {
 
 // ── Get stored financials for API ─────────────────────────────────
 export async function getCompanyFinancials(ticker: string) {
-  const company = await prisma.company.findUnique({ where: { ticker } });
+  const company = await prisma.company.findUnique({ where: { ticker } }) as any;
   if (!company) return null;
 
   const rows = await (prisma as any).financialStatement.findMany({
     where:   { companyId: company.id, period: 'annual' },
     orderBy: { fiscalYear: 'asc' },
-  });
+  }) as any;
 
   return {
     ticker,
@@ -231,13 +231,13 @@ export async function generateFinancialsExcel(
   ticker: string,
   companyName: string
 ): Promise<Buffer | null> {
-  const company = await prisma.company.findUnique({ where: { ticker } });
+  const company = await prisma.company.findUnique({ where: { ticker } }) as any;
   if (!company) return null;
 
   const rows = await (prisma as any).financialStatement.findMany({
     where:   { companyId: company.id, period: 'annual' },
     orderBy: { fiscalYear: 'asc' },
-  });
+  }) as any;
   if (rows.length === 0) return null;
 
   const wb       = XLSX.utils.book_new();
