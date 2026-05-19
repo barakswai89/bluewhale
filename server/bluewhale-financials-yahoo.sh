@@ -1,3 +1,24 @@
+#!/usr/bin/env bash
+# ================================================================
+# BlueWhale — Financials: Switch to yahoo-finance2 package
+# Problem: Raw axios calls to Yahoo quoteSummary fail silently
+#          because Yahoo requires crumb/cookie auth.
+# Fix:     yahoo-finance2 npm package handles auth automatically.
+# ================================================================
+set -e
+SERVER="/mnt/c/users/hp/documents/sargotec/bluewhale/bluewhale-prd/server"
+echo ""
+echo "🐋 Switching financials to yahoo-finance2..."
+
+# ── 1. Install yahoo-finance2 ────────────────────────────────────────
+echo "📦 Installing yahoo-finance2..."
+cd "$SERVER"
+npm install yahoo-finance2 --save
+echo "   ✅ yahoo-finance2 installed"
+
+# ── 2. Rewrite financials.service.ts ────────────────────────────────
+echo "📝 Rewriting financials.service.ts..."
+cat > src/services/financials.service.ts << 'EOF'
 // FILE: server/src/services/financials.service.ts
 // DATA SOURCE: yahoo-finance2 npm package
 // Why: Raw axios calls to Yahoo Finance v10/quoteSummary fail silently
@@ -341,3 +362,24 @@ export async function generateFinancialsExcel(
 
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
+EOF
+echo "   ✅ financials.service.ts rewritten"
+
+# ── 3. Commit and push ───────────────────────────────────────────────
+echo "🚀 Pushing to Railway..."
+git add -A
+git commit -m "fix: switch financials to yahoo-finance2 package (handles Yahoo crumb auth automatically)"
+git push
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ Fix deployed!"
+echo ""
+echo "Root cause:  Raw axios calls to Yahoo quoteSummary fail"
+echo "             because Yahoo requires crumb/cookie authentication."
+echo "Fix applied: yahoo-finance2 npm package handles auth automatically."
+echo ""
+echo "After deploy, click Sync on any company profile."
+echo "Watch Railway logs for:"
+echo "   ✅ MTN: 4 years stored (Yahoo Finance via yahoo-finance2)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
