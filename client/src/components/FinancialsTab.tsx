@@ -156,7 +156,7 @@ export default function FinancialsTab({ ticker, companyName }: Props) {
       await fetch(`${API}/financials/${ticker.toUpperCase()}/sync`, {
         method: 'POST', headers: authH(),
       });
-      await fetchData();
+      await fetchData(); // re-fetch after sync regardless of prior state
     } catch { setError('Sync failed.'); }
     finally  { setSyncing(false); }
   };
@@ -194,7 +194,7 @@ export default function FinancialsTab({ ticker, companyName }: Props) {
             Financial Statements
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Source: Financial Modeling Prep · Currency: {currency} Millions
+            Source: Yahoo Finance · Currency: {currency} Millions
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export default function FinancialsTab({ ticker, companyName }: Props) {
           </div>
 
           <p className="text-xs text-slate-600 text-right">
-            {companyName} · {years[0]}–{years[years.length - 1]} · {currency} Millions · Source: FMP
+            {companyName} · {years[0]}–{years[years.length - 1]} · {currency} Millions · Source: Yahoo Finance
           </p>
         </>
       )}
