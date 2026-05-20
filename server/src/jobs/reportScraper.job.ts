@@ -17,12 +17,10 @@ export async function runReportScraperJob(): Promise<void> {
   console.log('⚠️  Only real financial reports will be stored — NO MOCK DATA\n');
 
   try {
-    // Fetch all active companies that have a website configured
+    // Fetch all active companies — the scraper uses its own IR page map,
+    // not the website field, so we must not filter by website here.
     const companies = await prisma.company.findMany({
-      where: {
-        isActive: true,
-        website: { not: null },
-      },
+      where: { isActive: true },
       select: { id: true, ticker: true, name: true, website: true },
     });
 

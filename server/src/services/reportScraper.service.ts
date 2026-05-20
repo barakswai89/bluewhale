@@ -697,13 +697,13 @@ async function scrapeAGL(): Promise<ScrapedReport[]> {
 async function scrapeFromCompanyIRPage(ticker: string, companyWebsite: string): Promise<ScrapedReport[]> {
   const edgeCaseHandlers: Record<string, () => Promise<ScrapedReport[]>> = {
     'NPH': scrapeNPH,
-    'BHP': scrapeBHP, // ← ADDED: Use BHP-specific handler
-    'MTN': scrapeMTN, // ← UPDATED
+    'BHG': scrapeBHP, // BHG = BHP Group Ltd on JSE
+    'MTN': scrapeMTN,
     'NPN': scrapeNPN,
     'SHP': scrapeSHP,
     'VOD': scrapeVOD,
     'TBS': scrapeTBS,
-    'SBK': scrapeSBK, // ← UPDATED
+    'SBK': scrapeSBK,
     'APN': scrapeAPN,
     'AGL': scrapeAGL
   };
@@ -805,6 +805,93 @@ async function scrapeFromCompanyIRPage(ticker: string, companyWebsite: string): 
     'MCG': [
       'https://www.multichoicegroup.com/investor-relations/results-presentations/',
       'https://www.multichoicegroup.com/investor-relations/annual-report/',
+    ],
+    // ── Previously uncovered 20 companies ────────────────────
+
+    // Financials
+    'ABG': [
+      'https://www.absa.africa/absaafrica/investor-relations/annual-integrated-reports/',
+      'https://www.absa.co.za/investor-relations/results/',
+    ],
+    'NED': [
+      'https://www.nedbank.co.za/content/nedbank/desktop/gt/en/investor-relations/results/annual-report.html',
+      'https://www.nedbank.co.za/content/nedbank/desktop/gt/en/investor-relations/results.html',
+    ],
+    'SNT': [
+      'https://www.santam.co.za/investor-relations/annual-reports/',
+      'https://www.santam.co.za/investor-relations/results/',
+    ],
+    'REM': [
+      'https://www.remgro.com/investors/annual-financial-statements/',
+      'https://www.remgro.com/investors/',
+    ],
+    'INL': [
+      'https://www.investec.com/en_za/about-investec/investor-relations/results-and-presentations.html',
+      'https://www.investec.com/en_gb/welcome-to-investec/investor-relations/results-publications.html',
+    ],
+    'RDF': [
+      'https://www.redefine.co.za/investor-centre/results-presentations/',
+      'https://www.redefine.co.za/investor-centre/',
+    ],
+    'HYP': [
+      'https://www.hyprop.co.za/investor-relations/integrated-reports/',
+      'https://www.hyprop.co.za/investor-relations/results/',
+    ],
+
+    // Materials / Mining
+    'IMP': [
+      'https://www.implats.co.za/implats/reports.asp',
+      'https://www.implats.co.za/implats/investor-centre.asp',
+    ],
+    'SSW': [
+      'https://www.sibanyestillwater.com/investors/results-reports/',
+      'https://www.sibanyestillwater.com/investors/annual-reports/',
+    ],
+    'GLN': [
+      'https://www.glencore.com/investors/reports-results',
+      'https://www.glencore.com/investors/annual-reports',
+    ],
+
+    // Technology
+    'PRX': [
+      'https://www.prosus.com/investors/reports-results/',
+      'https://www.prosus.com/investors/',
+    ],
+
+    // Consumer / Retail
+    'BID': [
+      'https://www.bidcorp.com/investor-relations/results-and-presentations/',
+      'https://www.bidcorp.com/investor-relations/',
+    ],
+    'PIK': [
+      'https://www.pnpinvestors.co.za/results/',
+      'https://www.pnpinvestors.co.za/',
+    ],
+    'TRU': [
+      'https://www.truworths.co.za/investor/results.aspx',
+      'https://www.truworths.co.za/investor/',
+    ],
+    'CFR': [
+      'https://www.richemont.com/investors/reports-and-results/',
+      'https://www.richemont.com/investors/',
+    ],
+
+    // Industrials
+    'BTI': [
+      'https://www.bat.com/annualreport',
+      'https://www.bat.com/group/sites/UK__9D9KCY.nsf/vwPagesWebLive/DOBB7HJ3',
+    ],
+    'MNP': [
+      'https://www.mondigroup.com/investors/results-and-reports/',
+      'https://www.mondigroup.com/investors/annual-reports/',
+    ],
+    'WBO': [
+      'https://www.wbho.co.za/investor-centre/',
+      'https://www.wbho.co.za/investor-centre/annual-reports/',
+    ],
+    'SPG': [
+      'https://www.supergroup.co.za/investor-centre/reports/',
+      'https://www.supergroup.co.za/investor-centre/',
     ],
   };
 
