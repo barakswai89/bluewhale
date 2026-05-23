@@ -736,10 +736,9 @@ async function scrapeFromCompanyIRPage(ticker: string, companyWebsite: string): 
   };
 
   // CPI is impossible to scrape (403 with enterprise bot protection)
-  // Skip it entirely and show empty
+  // Return [] so the static fallback catalogue handles it
   if (ticker === 'CPI') {
-    console.log(`   ⚠️ CPI has enterprise bot protection - cannot scrape`);
-    console.log(`   💡 Recommendation: Add CPI reports manually to database`);
+    console.log(`   ⚠️ CPI has enterprise bot protection - using static fallback`);
     return [];
   }
 
@@ -1140,6 +1139,18 @@ const STATIC_REPORT_FALLBACK: Record<string, ScrapedReport[]> = {
   'AGL': [
     { title: 'Anglo American Platinum Integrated Annual Report 2023', url: 'https://www.angloplatinum.com/investor-centre/', type: 'Annual Report', date: new Date(2024, 2, 1) },
     { title: 'Anglo American Platinum Interim Results 2024', url: 'https://www.angloplatinum.com/investor-centre/', type: 'Interim Results', date: new Date(2024, 7, 1) },
+  ],
+  'APN': [
+    { title: 'Aspen Pharmacare Integrated Annual Report 2024', url: 'https://www.aspenpharmacares.com/investor-centre/financial-reports/', type: 'Annual Report', date: new Date(2024, 8, 1) },
+    { title: 'Aspen Pharmacare Interim Results 2024', url: 'https://www.aspenpharmacares.com/investor-centre/financial-reports/', type: 'Interim Results', date: new Date(2024, 2, 1) },
+  ],
+  'BID': [
+    { title: 'Bidcorp Integrated Annual Report 2024', url: 'https://www.bidcorp.com/investor-relations/', type: 'Annual Report', date: new Date(2024, 8, 1) },
+    { title: 'Bidcorp Interim Results 2024', url: 'https://www.bidcorp.com/investor-relations/results-and-presentations/', type: 'Interim Results', date: new Date(2024, 2, 1) },
+  ],
+  'CPI': [
+    { title: 'Capitec Bank Integrated Annual Report 2025', url: 'https://www.capitecbank.co.za/investor-relations/annual-reports/', type: 'Annual Report', date: new Date(2025, 2, 1) },
+    { title: 'Capitec Bank Interim Results 2025', url: 'https://www.capitecbank.co.za/investor-relations/results/', type: 'Interim Results', date: new Date(2024, 8, 1) },
   ],
 };
 
