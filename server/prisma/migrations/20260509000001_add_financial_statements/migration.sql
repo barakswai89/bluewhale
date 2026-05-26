@@ -1,7 +1,7 @@
 -- CreateTable: FinancialStatement (standalone financial data feature)
 -- Stores annual Income Statement, Balance Sheet, and Cash Flow per company.
 -- No existing tables are modified.
-CREATE TABLE IF NOT EXISTS "FinancialStatement" (
+CREATE TABLE "FinancialStatement" (
     "id"                   TEXT NOT NULL,
     "companyId"            TEXT NOT NULL,
     "fiscalYear"           INTEGER NOT NULL,
@@ -102,9 +102,9 @@ CREATE TABLE IF NOT EXISTS "FinancialStatement" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "FinancialStatement_companyId_fiscalYear_period_key"
+CREATE UNIQUE INDEX "FinancialStatement_companyId_fiscalYear_period_key"
     ON "FinancialStatement"("companyId", "fiscalYear", "period");
-CREATE INDEX IF NOT EXISTS "FinancialStatement_companyId_idx"
+CREATE INDEX "FinancialStatement_companyId_idx"
     ON "FinancialStatement"("companyId");
 
 -- AddForeignKey
