@@ -151,66 +151,116 @@ model HistoricalPrice {
 // FINANCIAL STATEMENTS & METRICS
 // ============================================
 
-enum StatementType {
-  ANNUAL
-  INTERIM
-  QUARTERLY
-}
-
 model FinancialStatement {
   id            String   @id @default(cuid())
-  
+
   companyId     String
   company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
   // Period
   fiscalYear    Int
-  fiscalPeriod  String
-  periodEnd     DateTime
-  statementType StatementType
-  
-  // Income Statement
-  revenue       Decimal? @db.Decimal(15, 2)
-  costOfRevenue Decimal? @db.Decimal(15, 2)
-  grossProfit   Decimal? @db.Decimal(15, 2)
-  operatingExpenses Decimal? @db.Decimal(15, 2)
-  ebitda        Decimal? @db.Decimal(15, 2)
-  ebit          Decimal? @db.Decimal(15, 2)
-  interestExpense Decimal? @db.Decimal(15, 2)
-  taxExpense    Decimal? @db.Decimal(15, 2)
-  netIncome     Decimal? @db.Decimal(15, 2)
-  
-  // Balance Sheet
-  totalAssets   Decimal? @db.Decimal(15, 2)
-  currentAssets Decimal? @db.Decimal(15, 2)
-  totalLiabilities Decimal? @db.Decimal(15, 2)
-  currentLiabilities Decimal? @db.Decimal(15, 2)
-  totalEquity   Decimal? @db.Decimal(15, 2)
-  cash          Decimal? @db.Decimal(15, 2)
-  debt          Decimal? @db.Decimal(15, 2)
-  
-  // Cash Flow
-  operatingCashFlow Decimal? @db.Decimal(15, 2)
-  investingCashFlow Decimal? @db.Decimal(15, 2)
-  financingCashFlow Decimal? @db.Decimal(15, 2)
-  freeCashFlow  Decimal? @db.Decimal(15, 2)
-  
-  // Per Share Data
-  eps           Decimal? @db.Decimal(10, 4)
-  bvps          Decimal? @db.Decimal(10, 4)
-  dividendPerShare Decimal? @db.Decimal(10, 4)
-  
-  // Metadata
+  period        String   @default("annual")
   currency      String   @default("ZAR")
-  sourceUrl     String?
-  isAudited     Boolean  @default(false)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@unique([companyId, fiscalYear, statementType])
-  @@index([companyId, fiscalYear])
-  @@index([periodEnd])
+  source        String   @default("Yahoo Finance")
+
+  // ── Income Statement ────────────────────────────────────────────
+  totalRevenues        Float?
+  revenueGrowthPct     Float?
+  costOfRevenues       Float?
+  grossProfit          Float?
+  grossMarginPct       Float?
+  sgaExpenses          Float?
+  rdExpenses           Float?
+  operatingIncome      Float?
+  operatingMarginPct   Float?
+  interestExpense      Float?
+  interestIncome       Float?
+  netInterestExpense   Float?
+  incomeTaxExpense     Float?
+  netIncome            Float?
+  netMarginPct         Float?
+  eps                  Float?
+  epsDiluted           Float?
+  sharesOutstanding    Float?
+  sharesDiluted        Float?
+  ebitda               Float?
+  ebit                 Float?
+
+  // ── Balance Sheet — Assets ───────────────────────────────────────
+  cashAndEquivalents   Float?
+  shortTermInvestments Float?
+  totalCashAndST       Float?
+  accountsReceivable   Float?
+  otherReceivables     Float?
+  totalReceivables     Float?
+  prepaidExpenses      Float?
+  otherCurrentAssets   Float?
+  totalCurrentAssets   Float?
+  grossPPE             Float?
+  accumulatedDeprec    Float?
+  netPPE               Float?
+  goodwill             Float?
+  otherIntangibles     Float?
+  totalIntangibles     Float?
+  otherNonCurrentAssets Float?
+  totalNonCurrentAssets Float?
+  totalAssets          Float?
+
+  // ── Balance Sheet — Liabilities ──────────────────────────────────
+  accountsPayable      Float?
+  accruedExpenses      Float?
+  currentDebt          Float?
+  currentLeases        Float?
+  unearnedRevenueCurr  Float?
+  otherCurrentLiab     Float?
+  totalCurrentLiab     Float?
+  longTermDebt         Float?
+  longTermLeases       Float?
+  deferredTaxLiab      Float?
+  otherNonCurrentLiab  Float?
+  totalNonCurrentLiab  Float?
+  totalLiabilities     Float?
+
+  // ── Balance Sheet — Equity ───────────────────────────────────────
+  commonStock          Float?
+  additionalPaidIn     Float?
+  retainedEarnings     Float?
+  treasuryStock        Float?
+  otherEquity          Float?
+  commonEquity         Float?
+  minorityInterest     Float?
+  totalEquity          Float?
+
+  // ── Cash Flow ────────────────────────────────────────────────────
+  cfNetIncome          Float?
+  depreciationAmort    Float?
+  stockBasedComp       Float?
+  changeInWorkingCap   Float?
+  otherOperating       Float?
+  cashFromOperations   Float?
+  capex                Float?
+  acquisitions         Float?
+  otherInvesting       Float?
+  cashFromInvesting    Float?
+  debtIssued           Float?
+  debtRepaid           Float?
+  stockIssuance        Float?
+  stockRepurchase      Float?
+  dividendsPaid        Float?
+  otherFinancing       Float?
+  cashFromFinancing    Float?
+  netChangeInCash      Float?
+  beginningCash        Float?
+  endingCash           Float?
+  freeCashFlow         Float?
+  freeCashFlowPerShare Float?
+
+  // ── Meta ─────────────────────────────────────────────────────────
+  fetchedAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@unique([companyId, fiscalYear, period])
+  @@index([companyId])
 }
 
 model CompanyMetrics {
