@@ -101,33 +101,6 @@ function isFinancialReport(title: string, url: string): boolean {
   return false;
 }
 
-// 🔧 HELPER FUNCTIONS ────────────────────────────────────────────────────────
-
-function classifyReport(title: string, url: string): ScrapedReport['type'] {
-  const combined = `${title} ${url}`.toLowerCase();
-  if (combined.includes('integrated') || combined.includes('annual')) {
-    return 'Annual Report';
-  }
-  if (combined.includes('interim') || combined.includes('half') || combined.includes('h1') || combined.includes('h2')) {
-    return 'Interim Results';
-  }
-  if (combined.includes('trading')) {
-    return 'Trading Statement';
-  }
-  if (combined.includes('financial')) {
-    return 'Financial Statement';
-  }
-  return 'Integrated Report';
-}
-
-function extractDate(text: string): Date {
-  const yearMatch = text.match(/20\d{2}/);
-  if (yearMatch) {
-    return new Date(parseInt(yearMatch[0]), 5, 30);
-  }
-  return new Date();
-}
-
 // 🎯 EDGE CASE HANDLERS FOR SPECIFIC COMPANIES
 
 // NEW: BHP with increased timeout and retry logic
@@ -736,9 +709,10 @@ async function scrapeFromCompanyIRPage(ticker: string, companyWebsite: string): 
   };
 
   // CPI is impossible to scrape (403 with enterprise bot protection)
-  // Return [] so the static fallback catalogue handles it
+  // Skip it entirely and show empty
   if (ticker === 'CPI') {
-    console.log(`   ⚠️ CPI has enterprise bot protection - using static fallback`);
+    console.log(`   ⚠️ CPI has enterprise bot protection - cannot scrape`);
+    console.log(`   💡 Recommendation: Add CPI reports manually to database`);
     return [];
   }
 
@@ -1140,19 +1114,35 @@ const STATIC_REPORT_FALLBACK: Record<string, ScrapedReport[]> = {
     { title: 'Anglo American Platinum Integrated Annual Report 2023', url: 'https://www.angloplatinum.com/investor-centre/', type: 'Annual Report', date: new Date(2024, 2, 1) },
     { title: 'Anglo American Platinum Interim Results 2024', url: 'https://www.angloplatinum.com/investor-centre/', type: 'Interim Results', date: new Date(2024, 7, 1) },
   ],
-  'APN': [
-    { title: 'Aspen Pharmacare Integrated Annual Report 2024', url: 'https://www.aspenpharmacares.com/investor-centre/financial-reports/', type: 'Annual Report', date: new Date(2024, 8, 1) },
-    { title: 'Aspen Pharmacare Interim Results 2024', url: 'https://www.aspenpharmacares.com/investor-centre/financial-reports/', type: 'Interim Results', date: new Date(2024, 2, 1) },
-  ],
-  'BID': [
-    { title: 'Bidcorp Integrated Annual Report 2024', url: 'https://www.bidcorp.com/investor-relations/', type: 'Annual Report', date: new Date(2024, 8, 1) },
-    { title: 'Bidcorp Interim Results 2024', url: 'https://www.bidcorp.com/investor-relations/results-and-presentations/', type: 'Interim Results', date: new Date(2024, 2, 1) },
-  ],
-  'CPI': [
-    { title: 'Capitec Bank Integrated Annual Report 2025', url: 'https://www.capitecbank.co.za/investor-relations/annual-reports/', type: 'Annual Report', date: new Date(2025, 2, 1) },
-    { title: 'Capitec Bank Interim Results 2025', url: 'https://www.capitecbank.co.za/investor-relations/results/', type: 'Interim Results', date: new Date(2024, 8, 1) },
-  ],
 };
+
+function determineReportType(title: string, url: string): string {
+  const combined = `${title} ${url}`.toLowerCase();
+  
+  if (combined.includes('integrated') || combined.includes('annual')) {
+    return 'Annual Report';
+  }
+  if (combined.includes('interim') || combined.includes('half') || combined.includes('h1') || combined.includes('h2')) {
+    return 'Interim Results';
+  }
+  if (combined.includes('trading')) {
+    return 'Trading Statement';
+  }
+  if (combined.includes('financial')) {
+    return 'Financial Statement';
+  }
+  
+  return 'Integrated Report';
+}
+
+function extractDate(text: string): Date {
+  const yearMatch = text.match(/20\d{2}/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[0]);
+    return new Date(year, 5, 30);
+  }
+  return new Date();
+}
 
 export async function scrapeCompanyReports(
   ticker: string,
