@@ -101,6 +101,33 @@ function isFinancialReport(title: string, url: string): boolean {
   return false;
 }
 
+// 🔧 HELPER FUNCTIONS ────────────────────────────────────────────────────────
+
+function classifyReport(title: string, url: string): ScrapedReport['type'] {
+  const combined = `${title} ${url}`.toLowerCase();
+  if (combined.includes('integrated') || combined.includes('annual')) {
+    return 'Annual Report';
+  }
+  if (combined.includes('interim') || combined.includes('half') || combined.includes('h1') || combined.includes('h2')) {
+    return 'Interim Results';
+  }
+  if (combined.includes('trading')) {
+    return 'Trading Statement';
+  }
+  if (combined.includes('financial')) {
+    return 'Financial Statement';
+  }
+  return 'Integrated Report';
+}
+
+function extractDate(text: string): Date {
+  const yearMatch = text.match(/20\d{2}/);
+  if (yearMatch) {
+    return new Date(parseInt(yearMatch[0]), 5, 30);
+  }
+  return new Date();
+}
+
 // 🎯 EDGE CASE HANDLERS FOR SPECIFIC COMPANIES
 
 // NEW: BHP with increased timeout and retry logic
