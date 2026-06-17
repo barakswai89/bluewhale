@@ -1,52 +1,35 @@
-{
-  "name": "bluewhale-server",
-  "version": "1.0.0",
-  "description": "BlueWhale Terminal Backend API",
-  "main": "dist/server.js",
-  "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "build:server": "cd server && npm run build",
-    "build:client": "cd client && npm run build",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "prisma:seed": "tsx prisma/seed.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "lint": "eslint . --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\""
+# paste the root package.json content, then Ctrl+O, Enter, Ctrl+X{
+  "name": "bluewhale-prd", "version": "1.0.0", "scripts": {
+# 5. Fix node engine in server/package.json "build": "cd server && npm install && npm run build",
+sed -i 's/"node": ">=20.0.0"/"node": ">=18.0.0"/' server/package.json "start": "cd server && npm run start", "install": "cd server && npm install"
   },
-  "dependencies": {
-    "@prisma/client": "^5.20.0",
-    "bcrypt": "^5.1.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/morgan": "^1.9.9",
-    "@types/node": "^20.14.2",
-    "@typescript-eslint/eslint-plugin": "^7.13.0",
-    "@typescript-eslint/parser": "^7.13.0",
-    "eslint": "^8.57.0",
-    "jest": "^29.7.0",
-    "prettier": "^3.3.2",
-    "prisma": "^5.20.0",
-    "tsx": "^4.15.5",
-    "typescript": "^5.4.5"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
+# 6. Make sure .gitignore exists and covers the right things "engines": {
+cat > .gitignore << 'EOF' "node": ">=18.0.0"
+# Dependencies }
+node_modules/} server/node_modules/ client/node_modules/
+# Build output
+server/dist/ client/dist/
+# Environment files (never commit these)
+.env server/.env client/.env.local client/.env.production
+# Logs
+*.log npm-debug.log*
+# OS
+.DS_Store Thumbs.db EOF
+# 7. Add the GitHub remote (your repo URL)
+git remote add origin https://github.com/barakswai89/bluewhale.git
+# If remote already exists:
+git remote set-url origin https://github.com/barakswai89/bluewhale.git
+# 8. Stage all files
+git add .
+# 9. Commit
+git commit -m "fix: root package.json for Railway build, fix node engine version"
+# 10. Push — use 'main' or 'master' depending on your default branch
+git branch -M main git push -u origin main
+
+
+
+
+
+
+
+
