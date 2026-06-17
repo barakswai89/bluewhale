@@ -1116,7 +1116,7 @@ const STATIC_REPORT_FALLBACK: Record<string, ScrapedReport[]> = {
   ],
 };
 
-function determineReportType(title: string, url: string): string {
+function classifyReport(title: string, url: string): string {
   const combined = `${title} ${url}`.toLowerCase();
   
   if (combined.includes('integrated') || combined.includes('annual')) {
