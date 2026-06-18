@@ -101,6 +101,58 @@ function isFinancialReport(title: string, url: string): boolean {
   return false;
 }
 
+// Classify a report into one of the ScrapedReport type values based on title/url keywords
+function classifyReport(title: string, url: string): ScrapedReport['type'] {
+  const combined = `${title} ${url}`.toLowerCase();
+
+  if (
+    combined.includes('integrated report') ||
+    combined.includes('integrated annual')
+  ) {
+    return 'Integrated Report';
+  }
+
+  if (
+    combined.includes('interim') ||
+    combined.includes('half year') ||
+    combined.includes('half-year') ||
+    combined.includes('six month') ||
+    combined.includes('h1 result') ||
+    combined.includes('h2 result')
+  ) {
+    return 'Interim Results';
+  }
+
+  if (
+    combined.includes('trading statement') ||
+    combined.includes('trading update') ||
+    combined.includes('trading statement')
+  ) {
+    return 'Trading Statement';
+  }
+
+  if (
+    combined.includes('annual report') ||
+    combined.includes('annual result') ||
+    combined.includes('full year') ||
+    combined.includes('full-year')
+  ) {
+    return 'Annual Report';
+  }
+
+  if (
+    combined.includes('financial statement') ||
+    combined.includes('audited result') ||
+    combined.includes('abridged result') ||
+    combined.includes('financial result')
+  ) {
+    return 'Financial Statement';
+  }
+
+  // Default fallback
+  return 'Annual Report';
+}
+
 // 🎯 EDGE CASE HANDLERS FOR SPECIFIC COMPANIES
 
 // NEW: BHP with increased timeout and retry logic
