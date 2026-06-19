@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TrendingUp, Sparkles, BarChart3, Shield } from 'lucide-react';
 import BlueWhaleLogo from '../components/BlueWhaleLogo';
 import { authService } from '../services/auth.service';
-import { authService } from '../services/auth.service';
 
 export default function LoginPage() {
   const navigate = useNavigate();
