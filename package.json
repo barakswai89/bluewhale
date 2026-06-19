@@ -1,35 +1,14 @@
-# paste the root package.json content, then Ctrl+O, Enter, Ctrl+X{
-  "name": "bluewhale-prd", "version": "1.0.0", "scripts": {
-# 5. Fix node engine in server/package.json "build": "cd server && npm install && npm run build",
-sed -i 's/"node": ">=20.0.0"/"node": ">=18.0.0"/' server/package.json "start": "cd server && npm run start", "install": "cd server && npm install"
+{
+  "name": "bluewhale",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "build:server": "cd server && npm install && npm run build",
+    "start": "cd server && npm run start",
+    "dev": "cd client && npm run dev"
   },
-# 6. Make sure .gitignore exists and covers the right things "engines": {
-cat > .gitignore << 'EOF' "node": ">=18.0.0"
-# Dependencies }
-node_modules/} server/node_modules/ client/node_modules/
-# Build output
-server/dist/ client/dist/
-# Environment files (never commit these)
-.env server/.env client/.env.local client/.env.production
-# Logs
-*.log npm-debug.log*
-# OS
-.DS_Store Thumbs.db EOF
-# 7. Add the GitHub remote (your repo URL)
-git remote add origin https://github.com/barakswai89/bluewhale.git
-# If remote already exists:
-git remote set-url origin https://github.com/barakswai89/bluewhale.git
-# 8. Stage all files
-git add .
-# 9. Commit
-git commit -m "fix: root package.json for Railway build, fix node engine version"
-# 10. Push — use 'main' or 'master' depending on your default branch
-git branch -M main git push -u origin main
-
-
-
-
-
-
-
-
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
