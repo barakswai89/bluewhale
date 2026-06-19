@@ -6,7 +6,7 @@ import axios, { AxiosInstance } from 'axios';
 // Now it reads VITE_API_URL from the appropriate .env file at build time.
 // Make sure Netlify has VITE_API_URL set in its environment variables dashboard.
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'https://bluewhale-production.up.railway.app/api/v1';
+  import.meta.env.VITE_API_URL || 'https://bluewhale-production-afb0.up.railway.app/api/v1';
 
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
