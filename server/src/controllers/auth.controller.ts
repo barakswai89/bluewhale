@@ -13,7 +13,12 @@ export class AuthController {
       const result = await authService.register(req.body);
       sendSuccess(res, result, 'Registration successful', 201);
     } catch (error: any) {
-      sendError(res, error.message, 400);
+      // ✅ FIX: Distinguish user-facing validation errors (400) from
+      // infrastructure failures like DB connection errors (500).
+      // Prisma errors contain a 'code' property; domain errors do not.
+      const isPrismaError = 'code' in error;
+      const statusCode = isPrismaError ? 500 : 400;
+      sendError(res, isPrismaError ? 'Internal server error' : error.message, statusCode);
     }
   }
 
@@ -22,7 +27,10 @@ export class AuthController {
       const result = await authService.login(req.body);
       sendSuccess(res, result, 'Login successful');
     } catch (error: any) {
-      sendError(res, error.message, 401);
+      // ✅ FIX: Same Prisma vs domain error discrimination as register.
+      const isPrismaError = 'code' in error;
+      const statusCode = isPrismaError ? 500 : 401;
+      sendError(res, isPrismaError ? 'Internal server error' : error.message, statusCode);
     }
   }
 

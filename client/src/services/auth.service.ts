@@ -57,7 +57,17 @@ export const authService = {
 
   getCurrentUser(): any | null {
     const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      // ✅ FIX: Corrupted localStorage value (partial write, XSS, etc.) would
+      // previously throw an uncaught exception and crash the app on load.
+      // Clear the bad entry and return null so the user is redirected to login.
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      return null;
+    }
   },
 
   isAuthenticated(): boolean {

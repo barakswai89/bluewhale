@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText, ExternalLink, Calendar, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { api } from '../services/api';
 
 interface SENSAnnouncement {
   date: string;
@@ -28,7 +29,7 @@ export default function SENSFeed({ ticker, compact = false }: SENSFeedProps) {
       setError(null);
       
       const token = localStorage.getItem('token');
-      const response = await fetch(`https://bluewhale-production.up.railway.app/api/v1/scraper/sens/${ticker}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bluewhale-production-afb0.up.railway.app/api/v1'}/scraper/sens/${ticker}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import MainLayout from '../components/MainLayout';
 
-const API = 'https://bluewhale-production.up.railway.app/api/v1';
+const API = import.meta.env.VITE_API_URL || 'https://bluewhale-production-afb0.up.railway.app/api/v1';
 
 export default function ScraperDashboard() {
   const [log, setLog] = useState<any>(null);

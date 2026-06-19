@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TrendingUp, Sparkles, BarChart3, Shield } from 'lucide-react';
 import BlueWhaleLogo from '../components/BlueWhaleLogo';
+import { authService } from '../services/auth.service';
+import { authService } from '../services/auth.service';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -23,25 +25,33 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('https://bluewhale-production.up.railway.app/api/v1/auth/' + (isLogin ? 'login' : 'register'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        navigate('/dashboard');
+      // ✅ FIX: Use the centralized authService (which uses api.ts + VITE_API_URL)
+      // instead of a hardcoded raw fetch. This ensures the correct Railway URL is
+      // used in every environment, and that auth headers / timeout / interceptors apply.
+      if (isLogin) {
+        await authService.login({
+          email: formData.email,
+          password: formData.password,
+        });
       } else {
-        setError(data.error || 'Authentication failed');
+        await authService.register({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+        });
       }
+      // authService already persists token + user to localStorage
+      navigate('/dashboard');
     } catch (err: any) {
-      setError('Network error. Please try again.');
+      // Axios wraps HTTP error bodies in err.response.data; fall back to err.message
+      // for genuine network failures (no connection, timeout, etc.)
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Network error. Please try again.';
+      setError(message);
       console.error('Auth error:', err);
     } finally {
       setLoading(false);
