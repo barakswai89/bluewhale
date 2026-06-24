@@ -50,3 +50,16 @@ Extend the scraping/aggregation pipeline to include:
 * Recent activity and profile update streams
 The profile service must shift from static snapshot retrieval to a continuously refreshable or regularly revalidated data model to ensure recency of information.
 Implement these changes before proceeding to the next item.
+
+
+
+ENVIRONMENTAL VARIABLES
+DATABASE_URL="postgresql://postgres:sKHlByrTJLYGNtDzMjzYReNFsbSfisUy@thomas.proxy.rlwy.net:57170/railway"
+DIRECT_URL="postgresql://postgres:sKHlByrTJLYGNtDzMjzYReNFsbSfisUy@thomas.proxy.rlwy.net:57170/railway"
+JWT_SECRET="ace3d373ec6962f4fc3bc9f0bd6246ae7ae96273456c4b5ab2fac15f358df185"
+JWT_EXPIRES_IN="7d"
+FMP_API_KEY="BdUA2UApEhod66FGG6zSTSFeodCU6qKT"
+CLIENT_URL="https://bluewhale-beta.netlify.app"
+CORS_ORIGIN="https://bluewhale-beta.netlify.app"
+NODE_ENV="production"
+ANTHROPIC_API_KEY=""

@@ -1,387 +1,432 @@
-// FILE: server/src/services/financials.service.ts
-// DATA SOURCE: yahoo-finance2 v3 — fundamentalsTimeSeries
-// NOTE: Since Nov 2024, incomeStatementHistory / balanceSheetHistory /
-//       cashflowStatementHistory return almost no data.
-//       fundamentalsTimeSeries with module:'all' is the correct replacement.
+/**
+ * financials.service.ts
+ *
+ * Fetches FY2025 financial data from Yahoo Finance and maps it to:
+ *  1. Flat columns on FinancialStatement (backward-compatible, used by summary/sparklines)
+ *  2. Hierarchical JSON detail (incomeStatementDetail, balanceSheetDetail, cashFlowDetail)
+ *     matching Financial_Template.xlsx exactly.
+ *
+ * Node >=20 required (pdf-parse dependency).
+ */
 
 import yahooFinance from 'yahoo-finance2';
-import * as XLSX from 'xlsx';
-import { prisma } from '../config/database';
+import { PrismaClient } from '@prisma/client';
+import type {
+  FinancialLineItem,
+  IncomeStatementDetail,
+  BalanceSheetDetail,
+  CashFlowDetail,
+} from '../types/financials.types';
 
-const DELAY = (ms: number) => new Promise(r => setTimeout(r, ms));
+const prisma = new PrismaClient();
 
-// Safely divide to percentage; return null if denominator is zero/null
-const pct = (num: number | null | undefined, den: number | null | undefined): number | null =>
-  num != null && den != null && den !== 0 ? (num / den) * 100 : null;
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-// Convert raw Yahoo value (full units) to Millions
-const toM = (v: number | null | undefined): number | null =>
-  v != null && !isNaN(v) ? Math.round((v / 1_000_000) * 10) / 10 : null;
-
-const asIs = (v: number | null | undefined): number | null =>
-  v != null && !isNaN(v) ? v : null;
-
-// ── Sync one company ──────────────────────────────────────────────────────────
-export async function syncCompanyFinancials(
-  ticker: string,
-  companyId: string
-): Promise<{ stored: number; error?: string }> {
-  const symbol = `${ticker}.JO`;
-
-  try {
-    // fundamentalsTimeSeries with module:'all' returns income statement,
-    // balance sheet and cash flow in a single array of period objects.
-    // period1 = 5 years back, period2 = today, type = 'annual'
-    const period1 = new Date();
-    period1.setFullYear(period1.getFullYear() - 6);
-
-    const rows = await (yahooFinance as any).fundamentalsTimeSeries(symbol, {
-      period1: period1.toISOString().split('T')[0],
-      type: 'annual',
-      module: 'all',
-    }) as any[];
-
-    if (!rows || rows.length === 0) {
-      return { stored: 0, error: `No fundamentals data returned for ${symbol}` };
-    }
-
-    // Sort ascending so i+1 is the previous year (for growth calc)
-    const sorted = [...rows].sort((a: any, b: any) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    let stored = 0;
-
-    for (let i = 0; i < sorted.length; i++) {
-      const r = sorted[i] as any;
-      const endDate = r.date instanceof Date ? r.date : new Date(r.date);
-      const fiscalYear = endDate.getFullYear();
-      if (!fiscalYear || isNaN(fiscalYear)) continue;
-
-      // ── Income Statement fields ───────────────────────────────────────────
-      const rev = toM(r.totalRevenue);
-      const gp  = toM(r.grossProfit);
-      const oi  = toM(r.operatingIncome ?? r.EBIT);
-      const ni  = toM(r.netIncome ?? r.netIncomeCommonStockholders);
-
-      // YoY revenue growth (compare to previous year in sorted array)
-      let revenueGrowthPct: number | null = null;
-      if (i > 0) {
-        const prevRev = toM((sorted[i - 1] as any).totalRevenue);
-        if (rev != null && prevRev != null && prevRev !== 0) {
-          revenueGrowthPct = ((rev - prevRev) / Math.abs(prevRev)) * 100;
-        }
-      }
-
-      // EBITDA = EBIT + D&A
-      const da    = toM(r.depreciationAndAmortization ?? r.reconciledDepreciation ?? r.depreciationAmortizationDepletion);
-      const ebit  = toM(r.EBIT ?? r.operatingIncome);
-      const ebitda = toM(r.EBITDA) ?? (ebit != null && da != null ? ebit + da : null);
-
-      // ── Cash Flow ─────────────────────────────────────────────────────────
-      const ops  = toM(r.operatingCashFlow ?? r.cashFlowFromContinuingOperatingActivities);
-      const capx = toM(r.capitalExpenditure); // negative in Yahoo
-      const fcf  = toM(r.freeCashFlow) ?? (
-        ops != null && capx != null ? ops + capx : null
-      );
-
-      const data: any = {
-        companyId,
-        fiscalYear,
-        period:   'annual',
-        currency: 'ZAR',
-        source:   'Yahoo Finance',
-
-        // ── Income Statement ─────────────────────────────────────────────
-        totalRevenues:      rev,
-        revenueGrowthPct,
-        costOfRevenues:     toM(r.costOfRevenue ?? r.reconciledCostOfRevenue),
-        grossProfit:        gp,
-        grossMarginPct:     pct(gp, rev),
-        sgaExpenses:        toM(r.sellingGeneralAndAdministration),
-        rdExpenses:         toM(r.researchAndDevelopment),
-        operatingIncome:    oi,
-        operatingMarginPct: pct(oi, rev),
-        ebit,
-        ebitda,
-        interestExpense:    toM(r.interestExpense ?? r.interestExpenseNonOperating),
-        interestIncome:     toM(r.interestIncome ?? r.interestIncomeNonOperating),
-        netInterestExpense: toM(r.netNonOperatingInterestIncomeExpense ?? r.netInterestIncome),
-        incomeTaxExpense:   toM(r.taxProvision),
-        netIncome:          ni,
-        netMarginPct:       pct(ni, rev),
-        eps:                asIs(r.basicEPS),
-        epsDiluted:         asIs(r.dilutedEPS),
-        sharesOutstanding:  toM(r.basicAverageShares ?? r.shareIssued),
-        sharesDiluted:      toM(r.dilutedAverageShares),
-
-        // ── Balance Sheet — Assets ────────────────────────────────────────
-        cashAndEquivalents:    toM(r.cashAndCashEquivalents ?? r.cashFinancial),
-        shortTermInvestments:  toM(r.otherShortTermInvestments),
-        totalCashAndST:        toM(r.cashCashEquivalentsAndShortTermInvestments),
-        accountsReceivable:    toM(r.accountsReceivable ?? r.grossAccountsReceivable),
-        otherReceivables:      toM(r.otherReceivables),
-        totalReceivables:      toM(r.receivables),
-        prepaidExpenses:       toM(r.prepaidAssets),
-        otherCurrentAssets:    toM(r.otherCurrentAssets),
-        totalCurrentAssets:    toM(r.currentAssets),
-        grossPPE:              toM(r.grossPPE),
-        accumulatedDeprec:     toM(r.accumulatedDepreciation),
-        netPPE:                toM(r.netPPE),
-        goodwill:              toM(r.goodwill),
-        otherIntangibles:      toM(r.otherIntangibleAssets),
-        totalIntangibles:      toM(r.goodwillAndOtherIntangibleAssets),
-        otherNonCurrentAssets: toM(r.otherNonCurrentAssets),
-        totalNonCurrentAssets: toM(r.totalNonCurrentAssets),
-        totalAssets:           toM(r.totalAssets),
-
-        // ── Balance Sheet — Liabilities ───────────────────────────────────
-        accountsPayable:     toM(r.accountsPayable),
-        accruedExpenses:     toM(r.currentAccruedExpenses ?? r.payablesAndAccruedExpenses),
-        currentDebt:         toM(r.currentDebt ?? r.currentDebtAndCapitalLeaseObligation),
-        currentLeases:       toM(r.currentCapitalLeaseObligation),
-        unearnedRevenueCurr: toM(r.currentDeferredRevenue),
-        otherCurrentLiab:    toM(r.otherCurrentLiabilities),
-        totalCurrentLiab:    toM(r.currentLiabilities),
-        longTermDebt:        toM(r.longTermDebt ?? r.longTermDebtAndCapitalLeaseObligation),
-        longTermLeases:      toM(r.longTermCapitalLeaseObligation),
-        deferredTaxLiab:     toM(r.nonCurrentDeferredTaxesLiabilities),
-        otherNonCurrentLiab: toM(r.otherNonCurrentLiabilities),
-        totalNonCurrentLiab: toM(r.totalNonCurrentLiabilitiesNetMinorityInterest),
-        totalLiabilities:    toM(r.totalLiabilitiesNetMinorityInterest),
-
-        // ── Balance Sheet — Equity ────────────────────────────────────────
-        commonStock:       toM(r.commonStock),
-        additionalPaidIn:  toM(r.additionalPaidInCapital),
-        retainedEarnings:  toM(r.retainedEarnings),
-        treasuryStock:     toM(r.treasuryStock),
-        commonEquity:      toM(r.commonStockEquity),
-        minorityInterest:  toM(r.minorityInterest),
-        totalEquity:       toM(r.totalEquityGrossMinorityInterest ?? r.stockholdersEquity),
-
-        // ── Cash Flow ─────────────────────────────────────────────────────
-        cfNetIncome:        toM(r.netIncomeFromContinuingOperations ?? r.netIncome),
-        depreciationAmort:  da,
-        stockBasedComp:     toM(r.stockBasedCompensation),
-        changeInWorkingCap: toM(r.changeInWorkingCapital),
-        otherOperating:     toM(r.otherNonCashItems),
-        cashFromOperations: ops,
-        capex:              capx,
-        acquisitions:       toM(r.purchaseOfBusiness),
-        otherInvesting:     toM(r.netOtherInvestingChanges),
-        cashFromInvesting:  toM(r.investingCashFlow ?? r.cashFlowFromContinuingInvestingActivities),
-        debtIssued:         toM(r.issuanceOfDebt ?? r.longTermDebtIssuance),
-        debtRepaid:         toM(r.repaymentOfDebt ?? r.longTermDebtPayments),
-        stockIssuance:      toM(r.commonStockIssuance),
-        stockRepurchase:    toM(r.repurchaseOfCapitalStock),
-        dividendsPaid:      toM(r.cashDividendsPaid ?? r.commonStockDividendPaid),
-        otherFinancing:     toM(r.netOtherFinancingCharges),
-        cashFromFinancing:  toM(r.financingCashFlow ?? r.cashFlowFromContinuingFinancingActivities),
-        netChangeInCash:    toM(r.changesInCash),
-        beginningCash:      toM(r.beginningCashPosition),
-        endingCash:         toM(r.endCashPosition),
-        freeCashFlow:       fcf,
-        freeCashFlowPerShare: ops != null && toM(r.basicAverageShares ?? r.shareIssued) != null
-          ? ops / (toM(r.basicAverageShares ?? r.shareIssued) as number)
-          : null,
-
-        fetchedAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      try {
-        await (prisma as any).financialStatement.upsert({
-          where:  { companyId_fiscalYear_period: { companyId, fiscalYear, period: 'annual' } },
-          update: data,
-          create: data,
-        });
-        stored++;
-      } catch (err: any) {
-        console.warn(`   ⚠️  ${ticker} FY${fiscalYear} upsert failed: ${err.message}`);
-      }
-    }
-
-    if (stored > 0) {
-      console.log(`   ✅ ${ticker}: ${stored} years stored (fundamentalsTimeSeries)`);
-    } else {
-      console.warn(`   ⚠️  ${ticker}: data fetched but nothing stored (${rows.length} rows returned)`);
-    }
-
-    return { stored };
-
-  } catch (err: any) {
-    const msg = err?.message || String(err);
-    console.warn(`   ⚠️  ${ticker} financials failed: ${msg}`);
-    return { stored: 0, error: msg };
-  }
+/** Convert raw Yahoo value (may be undefined/null) to millions, rounded to 2dp */
+function toM(v: number | null | undefined): number | null {
+  if (v == null || isNaN(v)) return null;
+  return Math.round((v / 1_000_000) * 100) / 100;
 }
 
-// ── Sync all active companies ─────────────────────────────────────────────────
-export async function syncAllFinancials(): Promise<void> {
-  const companies = await (prisma as any).company.findMany({
-    where:  { isActive: true },
-    select: { id: true, ticker: true },
-  });
-
-  console.log(`\n📊 Syncing financials for ${companies.length} companies (fundamentalsTimeSeries)...`);
-  let success = 0, failed = 0;
-
-  for (const c of companies as any[]) {
-    await DELAY(1500); // respect Yahoo rate limits
-    const result = await syncCompanyFinancials(c.ticker, c.id);
-    if (result.stored > 0) success++;
-    else failed++;
-  }
-
-  console.log(`✅ Financials sync done — ${success} with data, ${failed} failed/no data\n`);
+/** Build a leaf line item */
+function row(
+  label: string,
+  value: number | null | undefined,
+  indent = 1,
+  isTotal = false
+): FinancialLineItem {
+  return { label, value: toM(value) ?? null, indent, isTotal };
 }
 
-// ── Get stored financials for the API response ────────────────────────────────
-export async function getCompanyFinancials(ticker: string) {
-  const company = await prisma.company.findUnique({ where: { ticker } });
-  if (!company) return null;
-
-  const rows = await (prisma as any).financialStatement.findMany({
-    where:   { companyId: company.id, period: 'annual' },
-    orderBy: { fiscalYear: 'asc' },
-  });
-
-  return {
-    ticker,
-    company:    company.name,
-    currency:   (rows[0] as any)?.currency  || 'ZAR',
-    source:     (rows[0] as any)?.source    || 'Yahoo Finance',
-    years:      rows.map((r: any) => r.fiscalYear),
-    statements: rows,
-  };
+/** Build a total/bold row */
+function total(
+  label: string,
+  value: number | null | undefined,
+  indent = 1
+): FinancialLineItem {
+  return row(label, value, indent, true);
 }
 
-// ── Generate Excel matching the 3-tab template ────────────────────────────────
-export async function generateFinancialsExcel(
-  ticker: string,
-  companyName: string
-): Promise<Buffer | null> {
-  const company = await prisma.company.findUnique({ where: { ticker } });
-  if (!company) return null;
+/** Build a section header row */
+function header(label: string): FinancialLineItem {
+  return { label, value: null, indent: 0, isTotal: false, isHeader: true };
+}
 
-  const rows = await (prisma as any).financialStatement.findMany({
-    where:   { companyId: company.id, period: 'annual' },
-    orderBy: { fiscalYear: 'asc' },
+/** Safe add — returns null if all inputs are null */
+function safeAdd(...vals: (number | null)[]): number | null {
+  const nums = vals.filter((v): v is number => v !== null);
+  return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+}
+
+// ─── Target fiscal year ──────────────────────────────────────────────────────
+const TARGET_YEAR = 2025;
+
+// ─── Yahoo field path ────────────────────────────────────────────────────────
+type YahooAnnual = Record<string, any[]>;
+
+function getYearVal(data: YahooAnnual, field: string, year: number): number | null {
+  const series = data[field];
+  if (!Array.isArray(series)) return null;
+  // Yahoo returns objects with a `date` field like "2025-12-31"
+  const match = series.find((entry: any) => {
+    const d = entry?.asOfDate || entry?.date;
+    return d && String(d).startsWith(String(year));
   });
-  if (rows.length === 0) return null;
+  return match?.reportedValue?.raw ?? match?.raw ?? null;
+}
 
-  const wb       = XLSX.utils.book_new();
-  const years    = rows.map((r: any) => `FY${String(r.fiscalYear).slice(2)}`);
-  const currency = (rows[0] as any)?.currency || 'ZAR';
-  const vals     = (f: string) =>
-    rows.map((r: any) => r[f] != null ? Math.round(Number(r[f]) * 10) / 10 : '');
+// ─── Income Statement builder ────────────────────────────────────────────────
 
-  const header = (name: string) => [
-    [`${companyName} (${ticker})`],
-    [name],
-    ['Source: Yahoo Finance via fundamentalsTimeSeries'],
-    [`Currency: ${currency} Millions`],
-    [],
-    ['LINE ITEM', ...years],
+function buildIncomeStatement(ts: YahooAnnual, year: number): IncomeStatementDetail {
+  const g = (field: string) => getYearVal(ts, field, year);
+
+  const financeRevenue = g('financialServices') ?? g('totalRevenuefinancialServices');
+  const insuranceRevenue = g('insurancePremiums') ?? g('totalRevenueInsurance');
+  const otherRevenue = g('otherRevenue');
+  const totalRevenue = g('totalRevenue');
+
+  const cogs = g('costOfRevenue');
+  const grossProfit = g('grossProfit') ?? safeAdd(totalRevenue, cogs !== null ? -cogs : null);
+
+  const rd = g('researchAndDevelopment');
+  const sga = g('sellingGeneralAndAdministration');
+  const otherOpex = g('otherOperatingExpenses');
+  const totalOpex = g('operatingExpense') ?? safeAdd(cogs, rd, sga, otherOpex);
+
+  const ebit = g('operatingIncome') ?? g('ebit');
+  const interestIncome = g('interestIncome');
+  const interestExpense = g('interestExpense');
+  const netNonOpIncome = g('totalOtherIncomeExpensesNet') ?? g('nonOperatingIncomeNetOther');
+  const pretaxIncome = g('pretaxIncome');
+  const taxProvision = g('incomeTaxExpense');
+  const minorityInterest = g('minorityInterest');
+  const netIncome = g('netIncome');
+  const eps = g('basicEPS') ?? g('dilutedEPS');
+  const epsDiluted = g('dilutedEPS');
+  const sharesBasic = g('basicAverageShares');
+  const sharesDiluted = g('dilutedAverageShares');
+  const ebitda = g('EBITDA') ?? g('normalizedEBITDA');
+  const da = g('depreciationAndAmortization') ?? g('reconciledDepreciation');
+  const ebitdaMargin =
+    totalRevenue && ebitda ? Math.round((ebitda / totalRevenue) * 10000) / 100 : null;
+  const netMargin =
+    totalRevenue && netIncome ? Math.round((netIncome / totalRevenue) * 10000) / 100 : null;
+
+  const sections: FinancialLineItem[] = [
+    header('REVENUE'),
+    ...(financeRevenue !== null ? [row('Finance Revenue', financeRevenue, 2)] : []),
+    ...(insuranceRevenue !== null ? [row('Insurance Revenue', insuranceRevenue, 2)] : []),
+    ...(otherRevenue !== null ? [row('Other Revenue', otherRevenue, 2)] : []),
+    total('Total Revenue', totalRevenue, 1),
+
+    header('COST OF GOODS SOLD'),
+    total('Total COGS', cogs, 1),
+
+    header('GROSS PROFIT'),
+    total('Gross Profit', grossProfit, 1),
+
+    header('OPERATING EXPENSES'),
+    row('Research & Development', rd, 2),
+    row('Selling, General & Admin', sga, 2),
+    row('Other Operating Expenses', otherOpex, 2),
+    total('Total Operating Expenses', totalOpex, 1),
+
+    header('OPERATING INCOME (EBIT)'),
+    total('EBIT', ebit, 1),
+
+    header('NON-OPERATING INCOME / EXPENSES'),
+    row('Interest Income', interestIncome, 2),
+    row('Interest Expense', interestExpense, 2),
+    row('Net Non-Operating Income', netNonOpIncome, 2),
+
+    header('PRETAX INCOME'),
+    total('Pretax Income', pretaxIncome, 1),
+    row('Income Tax Provision', taxProvision, 2),
+    row('Minority Interest', minorityInterest, 2),
+
+    header('NET INCOME'),
+    total('Net Income', netIncome, 1),
+
+    header('EARNINGS PER SHARE'),
+    row('EPS (Basic)', eps, 2),
+    row('EPS (Diluted)', epsDiluted, 2),
+    row('Shares Outstanding (Basic)', sharesBasic, 2),
+    row('Shares Outstanding (Diluted)', sharesDiluted, 2),
+
+    header('PROFITABILITY'),
+    row('EBITDA', ebitda, 2),
+    row('D&A', da, 2),
+    row('EBITDA Margin %', ebitdaMargin, 2),
+    row('Net Profit Margin %', netMargin, 2),
   ];
 
-  const addSheet = (data: any[][], name: string) => {
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 38 }, ...years.map(() => ({ wch: 14 }))];
-    XLSX.utils.book_append_sheet(wb, ws, name);
+  return { fiscalYear: year, currency: 'USD', sections };
+}
+
+// ─── Balance Sheet builder ───────────────────────────────────────────────────
+
+function buildBalanceSheet(ts: YahooAnnual, year: number): BalanceSheetDetail {
+  const g = (field: string) => getYearVal(ts, field, year);
+
+  const cash = g('cashAndCashEquivalents');
+  const stInvestments = g('shortTermInvestments');
+  const tradingSecurities = g('tradingSecurities');
+  const totalCashST =
+    g('cashAndShortTermInvestments') ?? safeAdd(cash, stInvestments, tradingSecurities);
+  const receivables = g('netReceivables');
+  const inventory = g('inventory');
+  const otherCurrentAssets = g('otherCurrentAssets');
+  const totalCurrentAssets = g('totalCurrentAssets');
+
+  const ppe = g('netPPE') ?? g('propertyPlantEquipmentNet');
+  const goodwill = g('goodwill');
+  const intangibles = g('intangibleAssets');
+  const ltInvestments = g('longTermInvestments');
+  const otherLtAssets = g('otherLongTermAssets') ?? g('otherAssets');
+  const totalAssets = g('totalAssets');
+
+  const apPayable = g('accountsPayable');
+  const stDebt = g('shortTermDebt') ?? g('currentDebtAndCapitalLeaseObligation');
+  const deferredRevCurr = g('deferredRevenue');
+  const otherCurrentLiab = g('otherCurrentLiabilities');
+  const totalCurrentLiab = g('totalCurrentLiabilities');
+
+  const ltDebt = g('longTermDebt') ?? g('longTermDebtAndCapitalLeaseObligation');
+  const deferredRevLt = g('deferredRevenueNonCurrent');
+  const deferredTax = g('deferredTaxLiabilitiesNonCurrent');
+  const otherLtLiab = g('otherLiabilitiesNonCurrent') ?? g('otherNonCurrentLiabilities');
+  const totalLiabilities = g('totalLiabilitiesNetMinorityInterest');
+
+  const commonStock = g('commonStock');
+  const retainedEarnings = g('retainedEarnings');
+  const aoci = g('accumulatedOtherComprehensiveIncome') ?? g('otherComprehensiveIncome');
+  const treasury = g('treasuryStock') ?? g('treasurySharesNumber');
+  const totalEquity =
+    g('totalStockholdersEquity') ?? g('stockholdersEquity') ?? g('commonStockEquity');
+
+  const sections: FinancialLineItem[] = [
+    header('CURRENT ASSETS'),
+    {
+      label: 'Total Cash & ST Investments',
+      value: toM(totalCashST),
+      indent: 1,
+      isTotal: true,
+      children: [
+        row('Cash & Equivalents', cash, 2),
+        row('Short-Term Investments', stInvestments, 2),
+        row('Trading Securities', tradingSecurities, 2),
+      ],
+    },
+    row('Total Receivables', receivables, 1),
+    row('Inventory', inventory, 1),
+    row('Other Current Assets', otherCurrentAssets, 1),
+    total('Total Current Assets', totalCurrentAssets, 1),
+
+    header('NON-CURRENT ASSETS'),
+    row('Net PP&E', ppe, 1),
+    row('Goodwill', goodwill, 1),
+    row('Intangible Assets', intangibles, 1),
+    row('Long-Term Investments', ltInvestments, 1),
+    row('Other Long-Term Assets', otherLtAssets, 1),
+    total('Total Assets', totalAssets, 1),
+
+    header('CURRENT LIABILITIES'),
+    row('Accounts Payable', apPayable, 1),
+    row('Short-Term Debt', stDebt, 1),
+    row('Deferred Revenue (Current)', deferredRevCurr, 1),
+    row('Other Current Liabilities', otherCurrentLiab, 1),
+    total('Total Current Liabilities', totalCurrentLiab, 1),
+
+    header('NON-CURRENT LIABILITIES'),
+    row('Long-Term Debt', ltDebt, 1),
+    row('Deferred Revenue (Non-Current)', deferredRevLt, 1),
+    row('Deferred Tax Liabilities', deferredTax, 1),
+    row('Other Non-Current Liabilities', otherLtLiab, 1),
+    total('Total Liabilities', totalLiabilities, 1),
+
+    header('SHAREHOLDERS\' EQUITY'),
+    row('Common Stock & APIC', commonStock, 1),
+    row('Retained Earnings', retainedEarnings, 1),
+    row('Accumulated OCI', aoci, 1),
+    row('Treasury Stock', treasury, 1),
+    total('Total Equity', totalEquity, 1),
+  ];
+
+  return { fiscalYear: year, currency: 'USD', sections };
+}
+
+// ─── Cash Flow builder ───────────────────────────────────────────────────────
+
+function buildCashFlow(ts: YahooAnnual, year: number): CashFlowDetail {
+  const g = (field: string) => getYearVal(ts, field, year);
+
+  const netIncome = g('netIncome');
+  const da = g('depreciationAndAmortization') ?? g('reconciledDepreciation');
+  const sbc = g('stockBasedCompensation');
+  const deferredTaxCF = g('deferredIncomeTax');
+  const changeAR = g('changeInReceivables') ?? g('changesInAccountReceivables');
+  const changeInv = g('changeInInventory');
+  const changeAP = g('changeInAccountPayable') ?? g('changeInPayable');
+  const changeOther = g('changeInOtherWorkingCapital') ?? g('otherNonCashItems');
+  const cfo = g('operatingCashflow') ?? g('totalCashFromOperatingActivities');
+
+  const capex = g('capitalExpenditure') ?? g('capitalExpenditures');
+  const acquisitions = g('acquisitionsNet');
+  const ltInvPurchases = g('purchasesOfInvestments');
+  const ltInvSales = g('salesMaturitiesOfInvestments');
+  const otherInvesting = g('otherInvestingActivites') ?? g('otherInvestingCashFlowItems');
+  const cfi = g('investingCashFlow') ?? g('totalCashflowsFromInvestingActivities');
+
+  const debtIssued = g('issuanceOfDebt') ?? g('proceedsFromIssuanceOfDebt');
+  const debtRepaid = g('repaymentOfDebt') ?? g('repaymentsOfDebt');
+  const stockIssued = g('commonStockIssued') ?? g('proceedsFromStockOptionsExercised');
+  const buybacks = g('repurchaseOfCapitalStock') ?? g('commonStockRepurchased');
+  const dividends = g('dividendsPaid') ?? g('cashDividendsPaid');
+  const otherFinancing = g('otherFinancingActivites') ?? g('otherFinancingCashFlowItems');
+  const cff = g('financingCashFlow') ?? g('totalCashFromFinancingActivities');
+
+  const forex = g('effectOfForexChangesOnCash') ?? g('effectOfExchangeRateChanges');
+  const netChange = g('changesInCash') ?? g('netChangeInCash');
+  const beginCash = g('beginPeriodCashFlow') ?? g('cashAtBeginningOfPeriod');
+  const endCash = g('endPeriodCashFlow') ?? g('cashAtEndOfPeriod');
+  const fcf = cfo !== null && capex !== null ? cfo + capex : null; // capex is usually negative
+
+  const sections: FinancialLineItem[] = [
+    header('NET INCOME'),
+    total('Net Income', netIncome, 1),
+
+    header('CASH FROM OPERATIONS'),
+    row('Depreciation & Amortization', da, 2),
+    row('Stock-Based Compensation', sbc, 2),
+    row('Deferred Income Tax', deferredTaxCF, 2),
+    row('Change in Accounts Receivable', changeAR, 2),
+    row('Change in Inventories', changeInv, 2),
+    row('Change in Accounts Payable', changeAP, 2),
+    row('Change in Other Working Capital', changeOther, 2),
+    total('Total Cash from Operations', cfo, 1),
+
+    header('CASH FROM INVESTING'),
+    row('Capital Expenditures', capex, 2),
+    row('Acquisitions (Net)', acquisitions, 2),
+    row('Purchases of LT Investments', ltInvPurchases, 2),
+    row('Sales/Maturities of LT Investments', ltInvSales, 2),
+    row('Other Investing Activities', otherInvesting, 2),
+    total('Total Cash from Investing', cfi, 1),
+
+    header('CASH FROM FINANCING'),
+    row('Debt Issued', debtIssued, 2),
+    row('Debt Repaid', debtRepaid, 2),
+    row('Common Stock Issued', stockIssued, 2),
+    row('Stock Buybacks', buybacks, 2),
+    row('Dividends Paid', dividends, 2),
+    row('Other Financing Activities', otherFinancing, 2),
+    total('Total Cash from Financing', cff, 1),
+
+    header('NET CHANGE IN CASH'),
+    row('Effect of Forex on Cash', forex, 2),
+    total('Net Change in Cash', netChange, 1),
+    row('Beginning Cash Balance', beginCash, 2),
+    row('Ending Cash Balance', endCash, 2),
+    total('Free Cash Flow', fcf, 1),
+  ];
+
+  return { fiscalYear: year, currency: 'USD', sections };
+}
+
+// ─── Main service function ───────────────────────────────────────────────────
+
+export async function syncCompanyFinancials(ticker: string, companyId: string): Promise<void> {
+  console.log(`[financials] Syncing ${ticker} FY${TARGET_YEAR}...`);
+
+  let ts: YahooAnnual;
+  try {
+    const result = await yahooFinance.fundamentalsTimeSeries(ticker, {
+      type: 'annual',
+      period1: `${TARGET_YEAR - 1}-01-01`,
+      period2: `${TARGET_YEAR}-12-31`,
+    });
+    ts = result as unknown as YahooAnnual;
+  } catch (err) {
+    console.error(`[financials] Yahoo fetch failed for ${ticker}:`, err);
+    return;
+  }
+
+  const g = (field: string) => getYearVal(ts, field, TARGET_YEAR);
+
+  // Build hierarchical detail JSON
+  const incomeStatementDetail = buildIncomeStatement(ts, TARGET_YEAR);
+  const balanceSheetDetail = buildBalanceSheet(ts, TARGET_YEAR);
+  const cashFlowDetail = buildCashFlow(ts, TARGET_YEAR);
+
+  // Flat fields (backward-compatible with existing summary endpoints)
+  const flatData = {
+    fiscalYear: TARGET_YEAR,
+    currency: 'USD',
+
+    // Income Statement flat
+    totalRevenue: toM(g('totalRevenue')),
+    grossProfit: toM(g('grossProfit')),
+    operatingIncome: toM(g('operatingIncome') ?? g('ebit')),
+    netIncome: toM(g('netIncome')),
+    ebitda: toM(g('EBITDA') ?? g('normalizedEBITDA')),
+    eps: toM(g('dilutedEPS')),
+    researchAndDevelopment: toM(g('researchAndDevelopment')),
+    sellingGeneralAdmin: toM(g('sellingGeneralAndAdministration')),
+    interestExpense: toM(g('interestExpense')),
+    taxProvision: toM(g('incomeTaxExpense')),
+
+    // Balance Sheet flat
+    totalAssets: toM(g('totalAssets')),
+    totalLiabilities: toM(g('totalLiabilitiesNetMinorityInterest')),
+    totalEquity: toM(g('totalStockholdersEquity') ?? g('commonStockEquity')),
+    cashAndEquivalents: toM(g('cashAndCashEquivalents')),
+    shortTermInvestments: toM(g('shortTermInvestments')),
+    totalCurrentAssets: toM(g('totalCurrentAssets')),
+    totalCurrentLiabilities: toM(g('totalCurrentLiabilities')),
+    longTermDebt: toM(g('longTermDebt') ?? g('longTermDebtAndCapitalLeaseObligation')),
+    retainedEarnings: toM(g('retainedEarnings')),
+
+    // Cash Flow flat
+    operatingCashFlow: toM(g('operatingCashflow') ?? g('totalCashFromOperatingActivities')),
+    capitalExpenditures: toM(g('capitalExpenditure') ?? g('capitalExpenditures')),
+    freeCashFlow: (() => {
+      const cfo = g('operatingCashflow') ?? g('totalCashFromOperatingActivities');
+      const capex = g('capitalExpenditure') ?? g('capitalExpenditures');
+      return cfo !== null && capex !== null ? toM(cfo + capex) : null;
+    })(),
+    investingCashFlow: toM(g('investingCashFlow') ?? g('totalCashflowsFromInvestingActivities')),
+    financingCashFlow: toM(g('financingCashFlow') ?? g('totalCashFromFinancingActivities')),
+    dividendsPaid: toM(g('dividendsPaid') ?? g('cashDividendsPaid')),
+    stockRepurchase: toM(g('repurchaseOfCapitalStock') ?? g('commonStockRepurchased')),
+
+    // Hierarchical detail (new JSON columns)
+    incomeStatementDetail: incomeStatementDetail as object,
+    balanceSheetDetail: balanceSheetDetail as object,
+    cashFlowDetail: cashFlowDetail as object,
   };
 
-  addSheet([
-    ...header('Income Statement'),
-    ['── Revenues ──────────────────'],
-    ['Total Revenues',             ...vals('totalRevenues')],
-    ['YoY Revenue Growth (%)',     ...vals('revenueGrowthPct')],
-    ['Cost of Revenues',           ...vals('costOfRevenues')],
-    ['Gross Profit',               ...vals('grossProfit')],
-    ['Gross Margin (%)',           ...vals('grossMarginPct')],
-    [],
-    ['── Operating ─────────────────'],
-    ['SG&A Expenses',              ...vals('sgaExpenses')],
-    ['R&D Expenses',               ...vals('rdExpenses')],
-    ['Operating Income (EBIT)',    ...vals('operatingIncome')],
-    ['Operating Margin (%)',       ...vals('operatingMarginPct')],
-    ['EBITDA',                     ...vals('ebitda')],
-    [],
-    ['── Below the Line ────────────'],
-    ['Interest Expense',           ...vals('interestExpense')],
-    ['Interest Income',            ...vals('interestIncome')],
-    ['Net Interest Expense',       ...vals('netInterestExpense')],
-    ['Income Tax Expense',         ...vals('incomeTaxExpense')],
-    [],
-    ['── Bottom Line ───────────────'],
-    ['Net Income',                 ...vals('netIncome')],
-    ['Net Margin (%)',             ...vals('netMarginPct')],
-    ['EPS (Basic)',                ...vals('eps')],
-    ['EPS (Diluted)',              ...vals('epsDiluted')],
-    ['Shares Outstanding (M)',     ...vals('sharesOutstanding')],
-  ], 'Income Statement');
+  await prisma.financialStatement.upsert({
+    where: { companyId_fiscalYear: { companyId, fiscalYear: TARGET_YEAR } },
+    create: { companyId, ...flatData },
+    update: flatData,
+  });
 
-  addSheet([
-    ...header('Balance Sheet'),
-    ['── Current Assets ────────────'],
-    ['Cash & Equivalents',         ...vals('cashAndEquivalents')],
-    ['Short-Term Investments',     ...vals('shortTermInvestments')],
-    ['Total Cash & ST Invest.',    ...vals('totalCashAndST')],
-    ['Accounts Receivable',        ...vals('accountsReceivable')],
-    ['Total Receivables',          ...vals('totalReceivables')],
-    ['Prepaid Expenses',           ...vals('prepaidExpenses')],
-    ['Total Current Assets',       ...vals('totalCurrentAssets')],
-    [],
-    ['── Non-Current Assets ────────'],
-    ['Net PP&E',                   ...vals('netPPE')],
-    ['Goodwill',                   ...vals('goodwill')],
-    ['Total Intangibles',          ...vals('totalIntangibles')],
-    ['Total Assets',               ...vals('totalAssets')],
-    [],
-    ['── Liabilities ───────────────'],
-    ['Accounts Payable',           ...vals('accountsPayable')],
-    ['Accrued Expenses',           ...vals('accruedExpenses')],
-    ['Current Debt',               ...vals('currentDebt')],
-    ['Total Current Liabilities',  ...vals('totalCurrentLiab')],
-    ['Long-Term Debt',             ...vals('longTermDebt')],
-    ['Total Non-Current Liab.',    ...vals('totalNonCurrentLiab')],
-    ['Total Liabilities',          ...vals('totalLiabilities')],
-    [],
-    ['── Equity ────────────────────'],
-    ['Common Equity',              ...vals('commonEquity')],
-    ['Retained Earnings',          ...vals('retainedEarnings')],
-    ['Total Equity',               ...vals('totalEquity')],
-  ], 'Balance Sheet');
+  console.log(`[financials] ✓ ${ticker} FY${TARGET_YEAR} saved.`);
+}
 
-  addSheet([
-    ...header('Cash Flow Statement'),
-    ['── Operating ─────────────────'],
-    ['Net Income',                 ...vals('cfNetIncome')],
-    ['Depreciation & Amort.',      ...vals('depreciationAmort')],
-    ['Stock-Based Comp.',          ...vals('stockBasedComp')],
-    ['Change in Working Cap.',     ...vals('changeInWorkingCap')],
-    ['Cash from Operations',       ...vals('cashFromOperations')],
-    [],
-    ['── Investing ─────────────────'],
-    ['Capital Expenditure',        ...vals('capex')],
-    ['Acquisitions (Net)',         ...vals('acquisitions')],
-    ['Cash from Investing',        ...vals('cashFromInvesting')],
-    [],
-    ['── Financing ─────────────────'],
-    ['Debt Issued',                ...vals('debtIssued')],
-    ['Debt Repaid',                ...vals('debtRepaid')],
-    ['Stock Repurchase',           ...vals('stockRepurchase')],
-    ['Dividends Paid',             ...vals('dividendsPaid')],
-    ['Cash from Financing',        ...vals('cashFromFinancing')],
-    [],
-    ['Net Change in Cash',         ...vals('netChangeInCash')],
-    ['Beginning Cash',             ...vals('beginningCash')],
-    ['Ending Cash',                ...vals('endingCash')],
-    [],
-    ['── Free Cash Flow ────────────'],
-    ['Free Cash Flow',             ...vals('freeCashFlow')],
-    ['FCF per Share',              ...vals('freeCashFlowPerShare')],
-  ], 'Cash Flow Statement');
+/** Sync all companies in the database */
+export async function syncAllFinancials(): Promise<void> {
+  const companies = await prisma.company.findMany({ select: { id: true, ticker: true } });
+  console.log(`[financials] Starting sync for ${companies.length} companies...`);
 
-  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+  for (const company of companies) {
+    try {
+      await syncCompanyFinancials(company.ticker, company.id);
+    } catch (err) {
+      console.error(`[financials] Failed for ${company.ticker}:`, err);
+    }
+  }
+
+  console.log('[financials] Sync complete.');
+  await prisma.$disconnect();
 }

@@ -261,6 +261,10 @@ model FinancialStatement {
 
   @@unique([companyId, fiscalYear, period])
   @@index([companyId])
+  
+  incomeStatementDetail Json?
+  balanceSheetDetail    Json?
+  cashFlowDetail        Json?
 }
 
 model CompanyMetrics {

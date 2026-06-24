@@ -1,0 +1,27 @@
+You reached the start of the range
+Jun 18, 2026, 4:21 PM
+Starting Container
+npm warn config production Use `--omit=dev` instead.
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "railway", schema "public" at "thomas.proxy.rlwy.net:57170"
+4 migrations found in prisma/migrations
+No pending migrations to apply.
+┌─────────────────────────────────────────────────────────┐
+│  Update available 5.22.0 -> 7.8.0                       │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+npm warn config production Use `--omit=dev` instead.
+> bluewhale-server@1.0.0 start
+> node dist/server.js
+⚠️  WARNING: ANTHROPIC_API_KEY is not set — AI Hub features will fail
+Warning: Cannot access the `require` function: "TypeError: process.getBuiltinModule is not a function".
+Warning: Cannot polyfill `DOMMatrix`, rendering may be broken.
+Warning: Cannot polyfill `ImageData`, rendering may be broken.
+Warning: Cannot polyfill `Path2D`, rendering may be broken.
+/app/node_modules/pdf-parse/dist/pdf-parse/cjs/index.cjs:1
