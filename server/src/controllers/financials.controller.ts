@@ -15,8 +15,11 @@ import { prisma } from '../config/database';
 export async function getFinancials(req: Request, res: Response): Promise<void> {
   try {
     const { ticker } = req.params;
-    const data = await getCompanyFinancials(ticker.toUpperCase());
-    if (!data) { sendError(res, `No financial data for ${ticker}`, 404); return; }
+    const company = await prisma.company.findUnique({ where: { ticker: ticker.toUpperCase() } });
+    if (!company) { sendError(res, `Company ${ticker} not found`, 404); return; }
+
+    const data = await getCompanyFinancials(company.id);
+    if (!data || data.length === 0) { sendError(res, `No financial data for ${ticker}`, 404); return; }
     sendSuccess(res, data);
   } catch (err: any) {
     sendError(res, err.message, 500);
@@ -32,7 +35,7 @@ export async function downloadFinancials(req: Request, res: Response): Promise<v
     const company = await prisma.company.findUnique({ where: { ticker: t } });
     if (!company) { sendError(res, `Company ${ticker} not found`, 404); return; }
 
-    const buffer = await generateFinancialsExcel(t, company.name);
+    const buffer = await generateFinancialsExcel(company.id);
     if (!buffer) {
       sendError(res, `No financial data available for ${ticker}. Try syncing first.`, 404);
       return;
@@ -56,8 +59,8 @@ export async function syncFinancials(req: Request, res: Response): Promise<void>
     const company = await prisma.company.findUnique({ where: { ticker: t } });
     if (!company) { sendError(res, `Company ${ticker} not found`, 404); return; }
 
-    const result = await syncCompanyFinancials(t, company.id);
-    sendSuccess(res, { ticker: t, ...result });
+    await syncCompanyFinancials(t, company.id);
+    sendSuccess(res, { ticker: t, status: 'synced' });
   } catch (err: any) {
     sendError(res, err.message, 500);
   }
@@ -76,7 +79,7 @@ export async function syncAllFinancialsEndpoint(req: Request, res: Response): Pr
 }
 
 // GET /api/v1/financials/:ticker/summary
-// Returns key metrics across years for sparklines / quick view
+// Returns key metrics for sparklines / quick view
 export async function getFinancialsSummary(req: Request, res: Response): Promise<void> {
   try {
     const { ticker } = req.params;
@@ -84,14 +87,14 @@ export async function getFinancialsSummary(req: Request, res: Response): Promise
     if (!company) { sendError(res, `Company not found`, 404); return; }
 
     const rows = await (prisma as any).financialStatement.findMany({
-      where:   { companyId: company.id, period: 'annual' },
+      where:   { companyId: company.id },
       orderBy: { fiscalYear: 'asc' },
       select: {
-        fiscalYear: true, totalRevenues: true, grossProfit: true,
+        fiscalYear: true, totalRevenue: true, grossProfit: true,
         operatingIncome: true, netIncome: true, ebitda: true,
         totalAssets: true, totalLiabilities: true, totalEquity: true,
-        cashFromOperations: true, freeCashFlow: true, capex: true,
-        eps: true, epsDiluted: true,
+        operatingCashFlow: true, freeCashFlow: true, capitalExpenditures: true,
+        eps: true,
       },
     });
 

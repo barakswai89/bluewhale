@@ -405,11 +405,20 @@ export async function syncCompanyFinancials(ticker: string, companyId: string): 
     cashFlowDetail: cashFlowDetail as object,
   };
 
-  await prisma.financialStatement.upsert({
-    where: { companyId_fiscalYear: { companyId, fiscalYear: TARGET_YEAR } },
-    create: { companyId, ...flatData },
-    update: flatData,
+  const existing = await prisma.financialStatement.findFirst({
+    where: { companyId, fiscalYear: TARGET_YEAR },
+    select: { id: true },
   });
+  if (existing) {
+    await prisma.financialStatement.update({
+      where: { id: existing.id },
+      data: flatData,
+    });
+  } else {
+    await prisma.financialStatement.create({
+      data: { companyId, ...flatData },
+    });
+  }
 
   console.log(`[financials] ✓ ${ticker} FY${TARGET_YEAR} saved.`);
 }
@@ -429,4 +438,25 @@ export async function syncAllFinancials(): Promise<void> {
 
   console.log('[financials] Sync complete.');
   await prisma.$disconnect();
+}
+
+/**
+ * getCompanyFinancials — fetch stored financial statements for a company.
+ * Used by financials.controller.ts
+ */
+export async function getCompanyFinancials(companyId: string) {
+  return prisma.financialStatement.findMany({
+    where: { companyId },
+    orderBy: { fiscalYear: 'desc' },
+  });
+}
+
+/**
+ * generateFinancialsExcel — stub kept for controller compatibility.
+ * Returns null; implement xlsx generation here if needed.
+ */
+export async function generateFinancialsExcel(companyId: string): Promise<Buffer | null> {
+  // Placeholder — implement with exceljs/xlsx if Excel export is needed
+  console.warn(`[financials] generateFinancialsExcel called for ${companyId} — not yet implemented`);
+  return null;
 }

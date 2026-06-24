@@ -45,3 +45,5 @@ coverage/
 # archives
 *.zip
 *.bak
+Personal Access Token*.txt
+*.txt
