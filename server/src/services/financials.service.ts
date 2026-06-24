@@ -9,7 +9,8 @@
  * Node >=20 required (pdf-parse dependency).
  */
 
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+const yahooFinance = new YahooFinance();
 import { PrismaClient } from '@prisma/client';
 import type {
   FinancialLineItem,
@@ -341,6 +342,7 @@ export async function syncCompanyFinancials(ticker: string, companyId: string): 
   let ts: YahooAnnual;
   try {
     const result = await yahooFinance.fundamentalsTimeSeries(ticker, {
+      module: 'annualTotalRevenue,annualGrossProfit,annualOperatingIncome,annualNetIncome,annualEbitda,annualBasicEPS,annualDilutedEPS,annualBasicAverageShares,annualDilutedAverageShares,annualCostOfRevenue,annualResearchAndDevelopment,annualSellingGeneralAndAdministration,annualOtherOperatingExpenses,annualOperatingExpense,annualInterestIncome,annualInterestExpense,annualTotalOtherIncomeExpensesNet,annualPretaxIncome,annualIncomeTaxExpense,annualMinorityInterest,annualTotalAssets,annualTotalLiabilitiesNetMinorityInterest,annualTotalStockholdersEquity,annualCashAndCashEquivalents,annualShortTermInvestments,annualTotalCurrentAssets,annualTotalCurrentLiabilities,annualLongTermDebt,annualRetainedEarnings,annualNetPPE,annualGoodwill,annualIntangibleAssets,annualAccountsPayable,annualOperatingCashflow,annualCapitalExpenditure,annualInvestingCashFlow,annualFinancingCashFlow,annualFreeCashFlow,annualStockBasedCompensation,annualDepreciationAndAmortization,annualChangeInReceivables,annualChangeInInventory,annualChangeInAccountPayable',
       type: 'annual',
       period1: `${TARGET_YEAR - 1}-01-01`,
       period2: `${TARGET_YEAR}-12-31`,
