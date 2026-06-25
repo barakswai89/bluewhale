@@ -10,8 +10,8 @@
  */
 
 import YahooFinance from 'yahoo-finance2';
-const yahooFinance = new YahooFinance();
 import { PrismaClient } from '@prisma/client';
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] } as any);
 import type {
   FinancialLineItem,
   IncomeStatementDetail,
@@ -339,19 +339,40 @@ function buildCashFlow(ts: YahooAnnual, year: number): CashFlowDetail {
 export async function syncCompanyFinancials(ticker: string, companyId: string): Promise<void> {
   console.log(`[financials] Syncing ${ticker} FY${TARGET_YEAR}...`);
 
-  let ts: YahooAnnual;
+  // quoteSummary is more reliable than fundamentalsTimeSeries for JSE/global tickers
+  let qs: any;
   try {
-    const result = await yahooFinance.fundamentalsTimeSeries(ticker, {
-      module: 'annualTotalRevenue,annualGrossProfit,annualOperatingIncome,annualNetIncome,annualEbitda,annualBasicEPS,annualDilutedEPS,annualBasicAverageShares,annualDilutedAverageShares,annualCostOfRevenue,annualResearchAndDevelopment,annualSellingGeneralAndAdministration,annualOtherOperatingExpenses,annualOperatingExpense,annualInterestIncome,annualInterestExpense,annualTotalOtherIncomeExpensesNet,annualPretaxIncome,annualIncomeTaxExpense,annualMinorityInterest,annualTotalAssets,annualTotalLiabilitiesNetMinorityInterest,annualTotalStockholdersEquity,annualCashAndCashEquivalents,annualShortTermInvestments,annualTotalCurrentAssets,annualTotalCurrentLiabilities,annualLongTermDebt,annualRetainedEarnings,annualNetPPE,annualGoodwill,annualIntangibleAssets,annualAccountsPayable,annualOperatingCashflow,annualCapitalExpenditure,annualInvestingCashFlow,annualFinancingCashFlow,annualFreeCashFlow,annualStockBasedCompensation,annualDepreciationAndAmortization,annualChangeInReceivables,annualChangeInInventory,annualChangeInAccountPayable',
-      type: 'annual',
-      period1: `${TARGET_YEAR - 1}-01-01`,
-      period2: `${TARGET_YEAR}-12-31`,
-    });
-    ts = result as unknown as YahooAnnual;
+    qs = await yahooFinance.quoteSummary(ticker, {
+      modules: ['incomeStatementHistory', 'balanceSheetHistory', 'cashflowStatementHistory'],
+    } as any);
   } catch (err) {
     console.error(`[financials] Yahoo fetch failed for ${ticker}:`, err);
     return;
   }
+
+  // Map quoteSummary response into YahooAnnual shape (field -> [{asOfDate, raw}])
+  // quoteSummary returns arrays of annual statements; we pick the most recent FY entry
+  const ts: YahooAnnual = {};
+  const isHistory = qs?.incomeStatementHistory?.incomeStatementHistory ?? [];
+  const bsHistory = qs?.balanceSheetHistory?.balanceSheetHistory ?? [];
+  const cfHistory = qs?.cashflowStatementHistory?.cashflowStatementHistory ?? [];
+
+  function ingestStatements(rows: any[]) {
+    for (const row of rows) {
+      const date: string = row?.endDate?.fmt ?? row?.endDate ?? '';
+      for (const [key, val] of Object.entries(row)) {
+        if (key === 'endDate' || key === 'maxAge') continue;
+        const raw = (val as any)?.raw ?? val;
+        if (typeof raw !== 'number') continue;
+        if (!ts[key]) ts[key] = [];
+        ts[key].push({ asOfDate: date, raw });
+      }
+    }
+  }
+
+  ingestStatements(isHistory);
+  ingestStatements(bsHistory);
+  ingestStatements(cfHistory);
 
   const g = (field: string) => getYearVal(ts, field, TARGET_YEAR);
 
