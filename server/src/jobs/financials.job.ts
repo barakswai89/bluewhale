@@ -1,20 +1,10 @@
 // FILE: server/src/jobs/financials.job.ts
-// Weekly cron to refresh financial statements for all companies.
-// Startup sync removed — triggers Yahoo rate limits on 50 companies.
-// Use POST /api/v1/financials/:ticker/sync to sync individual companies.
-
-import cron from 'node-cron';
-import { syncAllFinancials } from '../services/financials.service';
+// DISABLED for demo build — financial data is seeded manually via
+// src/scripts/seedFinancials.ts, not synced live from Yahoo Finance.
+// The Yahoo sync service was removed due to upstream API blocking (crumb/cookie
+// auth failures from server IPs). Re-enable once a reliable data source is wired in.
 
 export function startFinancialsJob(): void {
-  console.log('📅 Financials job scheduled — every Sunday at 04:00');
-  console.log('💡 To sync a company: POST /api/v1/financials/:ticker/sync');
-
-  // Weekly refresh — every Sunday at 04:00
-  cron.schedule('0 4 * * 0', () => {
-    console.log('📅 Weekly financials sync starting (Sunday 04:00)...');
-    syncAllFinancials()
-      .then(() => console.log('✅ Weekly financials sync complete'))
-      .catch(err => console.error('❌ Weekly financials sync failed:', err.message));
-  });
+  console.log('📅 Financials job disabled — using seeded data for this build.');
+  console.log('💡 To refresh seed data: npx ts-node -r dotenv/config src/scripts/seedFinancials.ts');
 }
