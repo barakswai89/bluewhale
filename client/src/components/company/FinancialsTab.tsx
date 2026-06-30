@@ -1,140 +1,105 @@
 /**
  * FinancialsTab.tsx
  *
- * Renders Income Statement, Balance Sheet, and Cash Flow for FY2025
- * using the hierarchical detail JSON from the server, matching
- * Financial_Template.xlsx structure exactly.
- *
- * Indent levels:
- *   isHeader → section title row (blue background, caps)
- *   indent=1, isTotal=true  → bold total row
- *   indent=1, isTotal=false → normal top-level row
- *   indent=2                → indented child row (smaller, muted)
+ * Renders Income Statement, Balance Sheet, and Cash Flow line items
+ * for the most recent fiscal year, reading directly from the flat
+ * FinancialStatement schema (revenue, ebitda, cash, debt, etc.)
  */
 
 import React, { useState } from 'react';
-import type { FinancialLineItem, StatementDetail, FinancialDetailData } from '../../types/financials';
+
+// ─── Types matching the flat schema returned by the API ────────────────────
+
+export interface FlatFinancialYear {
+  fiscalYear: number;
+  currency: string;
+  revenue: number | null;
+  costOfRevenue: number | null;
+  grossProfit: number | null;
+  operatingExpenses: number | null;
+  ebitda: number | null;
+  ebit: number | null;
+  interestExpense: number | null;
+  taxExpense: number | null;
+  netIncome: number | null;
+  totalAssets: number | null;
+  currentAssets: number | null;
+  totalLiabilities: number | null;
+  currentLiabilities: number | null;
+  totalEquity: number | null;
+  cash: number | null;
+  debt: number | null;
+  operatingCashFlow: number | null;
+  investingCashFlow: number | null;
+  financingCashFlow: number | null;
+  freeCashFlow: number | null;
+  eps: number | null;
+  dividendPerShare: number | null;
+}
+
+interface FinancialsTabProps {
+  // Array of yearly statements (e.g. from /financials/:ticker/summary -> years)
+  years: FlatFinancialYear[] | null | undefined;
+}
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
 
-function fmt(value: number | null, label?: string): string {
+function fmtMoney(value: number | null): string {
   if (value === null || value === undefined) return '—';
-
-  // Percentage fields — detect by label heuristic
-  if (label && (label.includes('%') || label.toLowerCase().includes('margin'))) {
-    return `${value.toFixed(1)}%`;
-  }
-
-  // EPS and per-share fields
-  if (label && (label.toLowerCase().includes('eps') || label.toLowerCase().includes('per share'))) {
-    return `$${value.toFixed(2)}`;
-  }
-
-  // Shares outstanding (in millions → display as-is with M suffix)
-  if (label && label.toLowerCase().includes('shares')) {
-    return `${value.toFixed(1)}M`;
-  }
-
-  // Default: millions with $
   const abs = Math.abs(value);
-  if (abs >= 1000) {
-    return `$${(value / 1000).toFixed(2)}B`;
-  }
-  return `$${value.toFixed(1)}M`;
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(2)}B`;
+  return `${sign}$${abs.toFixed(1)}M`;
 }
 
-// ─── Row renderer ────────────────────────────────────────────────────────────
-
-interface RowProps {
-  item: FinancialLineItem;
-  year: number;
-  key?: string;
+function fmtPerShare(value: number | null): string {
+  if (value === null || value === undefined) return '—';
+  return `$${value.toFixed(2)}`;
 }
 
-function LineItemRow({ item, year }: RowProps) {
-  const [expanded, setExpanded] = useState(true);
-  const hasChildren = item.children && item.children.length > 0;
+// ─── Row definitions per statement ──────────────────────────────────────────
 
-  if (item.isHeader) {
-    return (
-      <tr className="financials-section-header">
-        <td colSpan={2} style={{
-          background: '#1a2744',
-          color: '#60a5fa',
-          fontWeight: 700,
-          fontSize: '0.7rem',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          padding: '10px 16px',
-          borderTop: '1px solid #1e3a5f',
-        }}>
-          {item.label}
-        </td>
-      </tr>
-    );
-  }
-
-  const isChild = item.indent >= 2;
-  const labelStyle: React.CSSProperties = {
-    paddingLeft: `${item.indent * 16}px`,
-    fontWeight: item.isTotal ? 700 : 400,
-    fontSize: isChild ? '0.8rem' : '0.875rem',
-    color: item.isTotal ? '#e2e8f0' : isChild ? '#94a3b8' : '#cbd5e1',
-    padding: `6px 16px 6px ${item.indent * 16}px`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    cursor: hasChildren ? 'pointer' : 'default',
-    userSelect: 'none',
-  };
-
-  const valueStyle: React.CSSProperties = {
-    fontWeight: item.isTotal ? 700 : 400,
-    fontSize: isChild ? '0.8rem' : '0.875rem',
-    color: item.value !== null && item.value < 0 ? '#f87171' : item.isTotal ? '#e2e8f0' : '#94a3b8',
-    textAlign: 'right',
-    padding: '6px 20px 6px 8px',
-    fontVariantNumeric: 'tabular-nums',
-  };
-
-  const rowStyle: React.CSSProperties = {
-    borderBottom: item.isTotal ? '1px solid #1e3a5f' : 'none',
-    background: item.isTotal && item.indent === 1 ? 'rgba(30,58,95,0.3)' : 'transparent',
-  };
-
-  return (
-    <>
-      <tr style={rowStyle}>
-        <td
-          style={labelStyle}
-          onClick={hasChildren ? () => setExpanded(e => !e) : undefined}
-        >
-          {hasChildren && (
-            <span style={{ fontSize: '0.6rem', opacity: 0.6, minWidth: '10px' }}>
-              {expanded ? '▼' : '▶'}
-            </span>
-          )}
-          {item.label}
-        </td>
-        <td style={valueStyle}>
-          {fmt(item.value, item.label)}
-        </td>
-      </tr>
-      {hasChildren && expanded && item.children!.map((child, i) => (
-        <LineItemRow key={`${child.label}-${i}`} item={child} year={year} />
-      ))}
-    </>
-  );
+interface RowDef {
+  label: string;
+  key: keyof FlatFinancialYear;
+  isTotal?: boolean;
+  isPerShare?: boolean;
 }
+
+const INCOME_ROWS: RowDef[] = [
+  { label: 'Revenue', key: 'revenue', isTotal: true },
+  { label: 'Cost of Revenue', key: 'costOfRevenue' },
+  { label: 'Gross Profit', key: 'grossProfit', isTotal: true },
+  { label: 'Operating Expenses', key: 'operatingExpenses' },
+  { label: 'EBITDA', key: 'ebitda' },
+  { label: 'EBIT (Operating Income)', key: 'ebit', isTotal: true },
+  { label: 'Interest Expense', key: 'interestExpense' },
+  { label: 'Tax Expense', key: 'taxExpense' },
+  { label: 'Net Income', key: 'netIncome', isTotal: true },
+  { label: 'EPS', key: 'eps', isPerShare: true },
+  { label: 'Dividend Per Share', key: 'dividendPerShare', isPerShare: true },
+];
+
+const BALANCE_ROWS: RowDef[] = [
+  { label: 'Cash & Equivalents', key: 'cash' },
+  { label: 'Current Assets', key: 'currentAssets' },
+  { label: 'Total Assets', key: 'totalAssets', isTotal: true },
+  { label: 'Current Liabilities', key: 'currentLiabilities' },
+  { label: 'Total Debt', key: 'debt' },
+  { label: 'Total Liabilities', key: 'totalLiabilities', isTotal: true },
+  { label: 'Total Equity', key: 'totalEquity', isTotal: true },
+];
+
+const CASHFLOW_ROWS: RowDef[] = [
+  { label: 'Operating Cash Flow', key: 'operatingCashFlow', isTotal: true },
+  { label: 'Investing Cash Flow', key: 'investingCashFlow' },
+  { label: 'Financing Cash Flow', key: 'financingCashFlow' },
+  { label: 'Free Cash Flow', key: 'freeCashFlow', isTotal: true },
+];
 
 // ─── Statement table ─────────────────────────────────────────────────────────
 
-interface StatementTableProps {
-  detail: StatementDetail;
-  title: string;
-}
-
-function StatementTable({ detail, title }: StatementTableProps) {
+function StatementTable({ rows, year, title }: { rows: RowDef[]; year: FlatFinancialYear; title: string }) {
   return (
     <div style={{
       background: '#0f1e38',
@@ -143,7 +108,6 @@ function StatementTable({ detail, title }: StatementTableProps) {
       overflow: 'hidden',
       marginBottom: '24px',
     }}>
-      {/* Table header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -160,19 +124,47 @@ function StatementTable({ detail, title }: StatementTableProps) {
           padding: '3px 10px',
           borderRadius: '20px',
         }}>
-          FY{detail.fiscalYear} · {detail.currency} (Millions)
+          FY{year.fiscalYear} · {year.currency} (Millions)
         </span>
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <colgroup>
-          <col style={{ width: '70%' }} />
-          <col style={{ width: '30%' }} />
+          <col style={{ width: '65%' }} />
+          <col style={{ width: '35%' }} />
         </colgroup>
         <tbody>
-          {detail.sections.map((item, i) => (
-            <LineItemRow key={`${item.label}-${i}`} item={item} year={detail.fiscalYear} />
-          ))}
+          {rows.map((row, i) => {
+            const value = year[row.key] as number | null;
+            return (
+              <tr
+                key={row.key}
+                style={{
+                  borderBottom: row.isTotal ? '1px solid #1e3a5f' : 'none',
+                  background: row.isTotal ? 'rgba(30,58,95,0.3)' : 'transparent',
+                }}
+              >
+                <td style={{
+                  padding: '8px 16px',
+                  fontWeight: row.isTotal ? 700 : 400,
+                  fontSize: '0.875rem',
+                  color: row.isTotal ? '#e2e8f0' : '#94a3b8',
+                }}>
+                  {row.label}
+                </td>
+                <td style={{
+                  padding: '8px 20px 8px 8px',
+                  textAlign: 'right',
+                  fontWeight: row.isTotal ? 700 : 400,
+                  fontSize: '0.875rem',
+                  fontVariantNumeric: 'tabular-nums',
+                  color: value !== null && value < 0 ? '#f87171' : row.isTotal ? '#e2e8f0' : '#94a3b8',
+                }}>
+                  {row.isPerShare ? fmtPerShare(value) : fmtMoney(value)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -181,20 +173,11 @@ function StatementTable({ detail, title }: StatementTableProps) {
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
-function EmptyState({ tab }: { tab: string }) {
+function EmptyState() {
   return (
-    <div style={{
-      textAlign: 'center',
-      padding: '60px 20px',
-      color: '#475569',
-    }}>
+    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#475569' }}>
       <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📊</div>
-      <div style={{ fontSize: '0.9rem' }}>
-        No {tab} data available for FY2025.
-      </div>
-      <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#334155' }}>
-        Run the sync script to populate financial data.
-      </div>
+      <div style={{ fontSize: '0.9rem' }}>No financial data available.</div>
     </div>
   );
 }
@@ -204,19 +187,22 @@ function EmptyState({ tab }: { tab: string }) {
 type TabKey = 'income' | 'balance' | 'cashflow';
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: 'income',   label: 'Income Statement' },
-  { key: 'balance',  label: 'Balance Sheet'    },
-  { key: 'cashflow', label: 'Cash Flow'        },
+  { key: 'income', label: 'Income Statement' },
+  { key: 'balance', label: 'Balance Sheet' },
+  { key: 'cashflow', label: 'Cash Flow' },
 ];
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-interface FinancialsTabProps {
-  financials: FinancialDetailData | null | undefined;
-}
-
-export default function FinancialsTab({ financials }: FinancialsTabProps) {
+export default function FinancialsTab({ years }: FinancialsTabProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('income');
+
+  if (!years || years.length === 0) {
+    return <EmptyState />;
+  }
+
+  // Most recent fiscal year (years is sorted ascending from the API)
+  const latest = years[years.length - 1];
 
   const tabStyle = (key: TabKey): React.CSSProperties => ({
     padding: '8px 18px',
@@ -230,15 +216,8 @@ export default function FinancialsTab({ financials }: FinancialsTabProps) {
     transition: 'all 0.15s',
   });
 
-  if (!financials) {
-    return <EmptyState tab="financial" />;
-  }
-
-  const { incomeStatementDetail, balanceSheetDetail, cashFlowDetail } = financials;
-
   return (
     <div style={{ padding: '20px 0' }}>
-      {/* Tab switcher */}
       <div style={{
         display: 'flex',
         gap: '4px',
@@ -249,32 +228,15 @@ export default function FinancialsTab({ financials }: FinancialsTabProps) {
         width: 'fit-content',
       }}>
         {TABS.map(tab => (
-          <button
-            key={tab.key}
-            style={tabStyle(tab.key)}
-            onClick={() => setActiveTab(tab.key)}
-          >
+          <button key={tab.key} style={tabStyle(tab.key)} onClick={() => setActiveTab(tab.key)}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      {activeTab === 'income' && (
-        incomeStatementDetail
-          ? <StatementTable detail={incomeStatementDetail} title="Income Statement" />
-          : <EmptyState tab="Income Statement" />
-      )}
-      {activeTab === 'balance' && (
-        balanceSheetDetail
-          ? <StatementTable detail={balanceSheetDetail} title="Balance Sheet" />
-          : <EmptyState tab="Balance Sheet" />
-      )}
-      {activeTab === 'cashflow' && (
-        cashFlowDetail
-          ? <StatementTable detail={cashFlowDetail} title="Cash Flow Statement" />
-          : <EmptyState tab="Cash Flow" />
-      )}
+      {activeTab === 'income' && <StatementTable rows={INCOME_ROWS} year={latest} title="Income Statement" />}
+      {activeTab === 'balance' && <StatementTable rows={BALANCE_ROWS} year={latest} title="Balance Sheet" />}
+      {activeTab === 'cashflow' && <StatementTable rows={CASHFLOW_ROWS} year={latest} title="Cash Flow Statement" />}
     </div>
   );
 }

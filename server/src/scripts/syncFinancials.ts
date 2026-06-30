@@ -9,6 +9,7 @@
  *   npx ts-node src/scripts/syncFinancials.ts AAPL MSFT # sync multiple tickers
  */
 
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { syncCompanyFinancials, syncAllFinancials } from '../services/financials.service';
 

@@ -1,6 +1,3 @@
-// BlueWhale Terminal - PostgreSQL Schema
-// Production-ready schema for JSE small-cap research platform
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,9 +7,367 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// USER MANAGEMENT & AUTHENTICATION
-// ============================================
+model User {
+  id                 String           @id @default(cuid())
+  email              String           @unique
+  passwordHash       String
+  firstName          String?
+  lastName           String?
+  role               UserRole         @default(USER)
+  subscription       SubscriptionTier @default(FREE)
+  stripeCustomerId   String?
+  subscriptionEndsAt DateTime?
+  avatarUrl          String?
+  company            String?
+  jobTitle           String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  lastLoginAt        DateTime?
+  alerts             Alert[]
+  apiKeys            ApiKey[]
+  reports            SavedReport[]
+  watchlists         Watchlist[]
+
+  @@index([email])
+  @@index([subscription])
+}
+
+model Company {
+  id                 String               @id @default(cuid())
+  ticker             String               @unique
+  name               String
+  isin               String?              @unique
+  jseCode            String?
+  sector             Sector
+  industry           String?
+  marketCap          Decimal?             @db.Decimal(15, 2)
+  description        String?
+  website            String?
+  logoUrl            String?
+  lastPrice          Decimal?             @db.Decimal(10, 2)
+  priceChange        Decimal?             @db.Decimal(10, 2)
+  priceChangePercent Decimal?             @db.Decimal(5, 2)
+  volume             BigInt?
+  isActive           Boolean              @default(true)
+  listedDate         DateTime?
+  dataSource         String?
+  lastScrapedAt      DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  metrics            CompanyMetrics[]
+  reports            CompanyReport[]
+  financials         FinancialStatement[]
+  historicalPrices   HistoricalPrice[]
+  news               NewsArticle[]
+  sentiments         SentimentAnalysis[]
+  watchlists         WatchlistItem[]
+
+  @@index([ticker])
+  @@index([sector])
+  @@index([marketCap])
+  @@index([isActive])
+}
+
+model HistoricalPrice {
+  id        String   @id @default(uuid())
+  companyId String
+  date      DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    BigInt
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, date])
+  @@index([companyId, date])
+}
+
+model FinancialStatement {
+  id                    String        @id @default(cuid())
+  companyId             String
+  fiscalYear            Int
+  fiscalPeriod          String
+  periodEnd             DateTime
+  statementType         StatementType
+  revenue               Decimal?      @db.Decimal(15, 2)
+  costOfRevenue         Decimal?      @db.Decimal(15, 2)
+  grossProfit           Decimal?      @db.Decimal(15, 2)
+  operatingExpenses     Decimal?      @db.Decimal(15, 2)
+  ebitda                Decimal?      @db.Decimal(15, 2)
+  ebit                  Decimal?      @db.Decimal(15, 2)
+  interestExpense       Decimal?      @db.Decimal(15, 2)
+  taxExpense            Decimal?      @db.Decimal(15, 2)
+  netIncome             Decimal?      @db.Decimal(15, 2)
+  totalAssets           Decimal?      @db.Decimal(15, 2)
+  currentAssets         Decimal?      @db.Decimal(15, 2)
+  totalLiabilities      Decimal?      @db.Decimal(15, 2)
+  currentLiabilities    Decimal?      @db.Decimal(15, 2)
+  totalEquity           Decimal?      @db.Decimal(15, 2)
+  cash                  Decimal?      @db.Decimal(15, 2)
+  debt                  Decimal?      @db.Decimal(15, 2)
+  operatingCashFlow     Decimal?      @db.Decimal(15, 2)
+  investingCashFlow     Decimal?      @db.Decimal(15, 2)
+  financingCashFlow     Decimal?      @db.Decimal(15, 2)
+  freeCashFlow          Decimal?      @db.Decimal(15, 2)
+  eps                   Decimal?      @db.Decimal(10, 4)
+  bvps                  Decimal?      @db.Decimal(10, 4)
+  dividendPerShare      Decimal?      @db.Decimal(10, 4)
+  currency              String        @default("ZAR")
+  sourceUrl             String?
+  isAudited             Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime
+  incomeStatementDetail Json?
+  balanceSheetDetail    Json?
+  cashFlowDetail        Json?
+  period                String        @default("annual")
+  source                String        @default("Manual")
+  revenueGrowthPct      Float?
+  costOfRevenues        Float?
+  grossMarginPct        Float?
+  sgaExpenses           Float?
+  rdExpenses            Float?
+  operatingMarginPct    Float?
+  interestIncome        Float?
+  netInterestExpense    Float?
+  netMarginPct          Float?
+  epsDiluted            Float?
+  sharesOutstanding     Float?
+  sharesDiluted         Float?
+  shortTermInvestments  Float?
+  totalCashAndST        Float?
+  accountsReceivable    Float?
+  otherReceivables      Float?
+  totalReceivables      Float?
+  prepaidExpenses       Float?
+  otherCurrentAssets    Float?
+  grossPPE              Float?
+  accumulatedDeprec     Float?
+  netPPE                Float?
+  goodwill              Float?
+  otherIntangibles      Float?
+  totalIntangibles      Float?
+  otherNonCurrentAssets Float?
+  totalNonCurrentAssets Float?
+  accountsPayable       Float?
+  accruedExpenses       Float?
+  currentDebt           Float?
+  currentLeases         Float?
+  unearnedRevenueCurr   Float?
+  otherCurrentLiab      Float?
+  longTermLeases        Float?
+  deferredTaxLiab       Float?
+  otherNonCurrentLiab   Float?
+  totalNonCurrentLiab   Float?
+  commonStock           Float?
+  additionalPaidIn      Float?
+  treasuryStock         Float?
+  otherEquity           Float?
+  commonEquity          Float?
+  minorityInterest      Float?
+  cfNetIncome           Float?
+  depreciationAmort     Float?
+  stockBasedComp        Float?
+  changeInWorkingCap    Float?
+  otherOperating        Float?
+  acquisitions          Float?
+  otherInvesting        Float?
+  debtIssued            Float?
+  debtRepaid            Float?
+  stockIssuance         Float?
+  stockRepurchase       Float?
+  otherFinancing        Float?
+  netChangeInCash       Float?
+  beginningCash         Float?
+  endingCash            Float?
+  freeCashFlowPerShare  Float?
+  fetchedAt             DateTime      @default(now()) @db.Timestamp(6)
+  company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, fiscalYear, statementType])
+  @@index([companyId, fiscalYear])
+  @@index([periodEnd])
+}
+
+model CompanyMetrics {
+  id               String   @id @default(cuid())
+  companyId        String
+  peRatio          Decimal? @db.Decimal(10, 2)
+  pbRatio          Decimal? @db.Decimal(10, 2)
+  psRatio          Decimal? @db.Decimal(10, 2)
+  evToEbitda       Decimal? @db.Decimal(10, 2)
+  roe              Decimal? @db.Decimal(10, 2)
+  roa              Decimal? @db.Decimal(10, 2)
+  roic             Decimal? @db.Decimal(10, 2)
+  grossMargin      Decimal? @db.Decimal(10, 2)
+  operatingMargin  Decimal? @db.Decimal(10, 2)
+  netMargin        Decimal? @db.Decimal(10, 2)
+  currentRatio     Decimal? @db.Decimal(10, 2)
+  quickRatio       Decimal? @db.Decimal(10, 2)
+  debtToEquity     Decimal? @db.Decimal(10, 2)
+  interestCoverage Decimal? @db.Decimal(10, 2)
+  dividendYield    Decimal? @db.Decimal(5, 2)
+  payoutRatio      Decimal? @db.Decimal(5, 2)
+  revenueGrowth    Decimal? @db.Decimal(10, 2)
+  epsGrowth        Decimal? @db.Decimal(10, 2)
+  asOfDate         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, asOfDate])
+  @@index([peRatio])
+  @@index([dividendYield])
+}
+
+model CompanyReport {
+  id          String        @id @default(cuid())
+  companyId   String
+  title       String
+  reportType  String
+  fiscalYear  Int?
+  publishDate DateTime
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  summary     String?
+  keyPoints   String[]
+  sentiment   String?
+  aiProcessed Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  savedBy     SavedReport[]
+
+  @@unique([companyId, title])
+  @@index([companyId, publishDate])
+  @@index([reportType])
+}
+
+model SavedReport {
+  id        String        @id @default(cuid())
+  userId    String
+  reportId  String
+  notes     String?
+  createdAt DateTime      @default(now())
+  report    CompanyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reportId])
+  @@index([userId])
+}
+
+model Watchlist {
+  id          String          @id @default(cuid())
+  userId      String
+  name        String          @default("My Watchlist")
+  description String?
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       WatchlistItem[]
+
+  @@index([userId])
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  watchlistId String
+  companyId   String
+  targetPrice Decimal?  @db.Decimal(10, 2)
+  notes       String?
+  addedAt     DateTime  @default(now())
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, companyId])
+  @@index([watchlistId])
+  @@index([companyId])
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  userId      String
+  companyId   String?
+  type        AlertType
+  threshold   Decimal?  @db.Decimal(10, 2)
+  message     String?
+  isActive    Boolean   @default(true)
+  triggered   Boolean   @default(false)
+  triggeredAt DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([companyId])
+}
+
+model SentimentAnalysis {
+  id         String   @id @default(cuid())
+  companyId  String
+  source     String
+  sourceUrl  String?
+  sentiment  String
+  score      Decimal  @db.Decimal(5, 2)
+  summary    String?
+  keywords   String[]
+  analyzedAt DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, analyzedAt])
+  @@index([sentiment])
+}
+
+model NewsArticle {
+  id          String   @id @default(cuid())
+  companyId   String
+  title       String
+  summary     String?
+  url         String
+  source      String
+  publishedAt DateTime
+  scrapedAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, publishedAt])
+}
+
+model ApiKey {
+  id                String    @id @default(cuid())
+  userId            String
+  key               String    @unique
+  name              String
+  requestsPerDay    Int       @default(1000)
+  requestsUsedToday Int       @default(0)
+  lastResetAt       DateTime  @default(now())
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  expiresAt         DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+}
+
+model ScraperJob {
+  id           String    @id @default(cuid())
+  jobType      String
+  targetUrl    String
+  status       String
+  attempts     Int       @default(0)
+  companyId    String?
+  errorMessage String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([jobType])
+  @@index([createdAt])
+}
 
 enum UserRole {
   USER
@@ -25,43 +380,6 @@ enum SubscriptionTier {
   PRO
   ENTERPRISE
 }
-
-model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
-  firstName     String?
-  lastName      String?
-  role          UserRole @default(USER)
-  
-  // Subscription
-  subscription  SubscriptionTier @default(FREE)
-  stripeCustomerId String?
-  subscriptionEndsAt DateTime?
-  
-  // Profile
-  avatarUrl     String?
-  company       String?
-  jobTitle      String?
-  
-  // Relationships
-  watchlists    Watchlist[]
-  alerts        Alert[]
-  reports       SavedReport[]
-  apiKeys       ApiKey[]
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastLoginAt   DateTime?
-  
-  @@index([email])
-  @@index([subscription])
-}
-
-// ============================================
-// COMPANIES & FINANCIAL DATA
-// ============================================
 
 enum Sector {
   FINANCIALS
@@ -77,341 +395,6 @@ enum Sector {
   OTHER
 }
 
-model Company {
-  id            String   @id @default(cuid())
-  
-  // Identifiers
-  ticker        String   @unique
-  name          String
-  isin          String?  @unique
-  jseCode       String?
-  
-  // Classification
-  sector        Sector
-  industry      String?
-  marketCap     Decimal? @db.Decimal(15, 2)
-  
-  // Company Info
-  description   String?  @db.Text
-  website       String?
-  logoUrl       String?
-  
-  // Trading Data
-  lastPrice     Decimal? @db.Decimal(10, 2)
-  priceChange   Decimal? @db.Decimal(10, 2)
-  priceChangePercent Decimal? @db.Decimal(5, 2)
-  volume        BigInt?
-  
-  // Status
-  isActive      Boolean  @default(true)
-  listedDate    DateTime?
-  
-  // Relationships
-  financials    FinancialStatement[]
-  metrics       CompanyMetrics[]
-  reports       CompanyReport[]
-  watchlists    WatchlistItem[]
-  news          NewsArticle[]
-  sentiments    SentimentAnalysis[]
-  historicalPrices HistoricalPrice[]
-  
-  // Data source tracking
-  dataSource    String?
-  lastScrapedAt DateTime?
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([ticker])
-  @@index([sector])
-  @@index([marketCap])
-  @@index([isActive])
-}
-
-model HistoricalPrice {
-  id        String   @id @default(uuid())
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  date      DateTime
-  open      Float
-  high      Float
-  low       Float
-  close     Float
-  volume    BigInt
-  
-  createdAt DateTime @default(now())
-
-  @@index([companyId, date])
-  @@unique([companyId, date])
-}
-
-// ============================================
-// FINANCIAL STATEMENTS & METRICS
-// ============================================
-
-model FinancialStatement {
-  id            String   @id @default(cuid())
-
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  // Period
-  fiscalYear    Int
-  period        String   @default("annual")
-  currency      String   @default("ZAR")
-  source        String   @default("Yahoo Finance")
-
-  // ── Income Statement ────────────────────────────────────────────
-  totalRevenues        Float?
-  revenueGrowthPct     Float?
-  costOfRevenues       Float?
-  grossProfit          Float?
-  grossMarginPct       Float?
-  sgaExpenses          Float?
-  rdExpenses           Float?
-  operatingIncome      Float?
-  operatingMarginPct   Float?
-  interestExpense      Float?
-  interestIncome       Float?
-  netInterestExpense   Float?
-  incomeTaxExpense     Float?
-  netIncome            Float?
-  netMarginPct         Float?
-  eps                  Float?
-  epsDiluted           Float?
-  sharesOutstanding    Float?
-  sharesDiluted        Float?
-  ebitda               Float?
-  ebit                 Float?
-
-  // ── Balance Sheet — Assets ───────────────────────────────────────
-  cashAndEquivalents   Float?
-  shortTermInvestments Float?
-  totalCashAndST       Float?
-  accountsReceivable   Float?
-  otherReceivables     Float?
-  totalReceivables     Float?
-  prepaidExpenses      Float?
-  otherCurrentAssets   Float?
-  totalCurrentAssets   Float?
-  grossPPE             Float?
-  accumulatedDeprec    Float?
-  netPPE               Float?
-  goodwill             Float?
-  otherIntangibles     Float?
-  totalIntangibles     Float?
-  otherNonCurrentAssets Float?
-  totalNonCurrentAssets Float?
-  totalAssets          Float?
-
-  // ── Balance Sheet — Liabilities ──────────────────────────────────
-  accountsPayable      Float?
-  accruedExpenses      Float?
-  currentDebt          Float?
-  currentLeases        Float?
-  unearnedRevenueCurr  Float?
-  otherCurrentLiab     Float?
-  totalCurrentLiab     Float?
-  longTermDebt         Float?
-  longTermLeases       Float?
-  deferredTaxLiab      Float?
-  otherNonCurrentLiab  Float?
-  totalNonCurrentLiab  Float?
-  totalLiabilities     Float?
-
-  // ── Balance Sheet — Equity ───────────────────────────────────────
-  commonStock          Float?
-  additionalPaidIn     Float?
-  retainedEarnings     Float?
-  treasuryStock        Float?
-  otherEquity          Float?
-  commonEquity         Float?
-  minorityInterest     Float?
-  totalEquity          Float?
-
-  // ── Cash Flow ────────────────────────────────────────────────────
-  cfNetIncome          Float?
-  depreciationAmort    Float?
-  stockBasedComp       Float?
-  changeInWorkingCap   Float?
-  otherOperating       Float?
-  cashFromOperations   Float?
-  capex                Float?
-  acquisitions         Float?
-  otherInvesting       Float?
-  cashFromInvesting    Float?
-  debtIssued           Float?
-  debtRepaid           Float?
-  stockIssuance        Float?
-  stockRepurchase      Float?
-  dividendsPaid        Float?
-  otherFinancing       Float?
-  cashFromFinancing    Float?
-  netChangeInCash      Float?
-  beginningCash        Float?
-  endingCash           Float?
-  freeCashFlow         Float?
-  freeCashFlowPerShare Float?
-
-  // ── Meta ─────────────────────────────────────────────────────────
-  fetchedAt     DateTime @default(now())
-  updatedAt     DateTime @default(now())
-
-  @@unique([companyId, fiscalYear, period])
-  @@index([companyId])
-  
-  incomeStatementDetail Json?
-  balanceSheetDetail    Json?
-  cashFlowDetail        Json?
-}
-
-model CompanyMetrics {
-  id            String   @id @default(cuid())
-  
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  // Valuation Ratios
-  peRatio       Decimal? @db.Decimal(10, 2)
-  pbRatio       Decimal? @db.Decimal(10, 2)
-  psRatio       Decimal? @db.Decimal(10, 2)
-  evToEbitda    Decimal? @db.Decimal(10, 2)
-  
-  // Profitability
-  roe           Decimal? @db.Decimal(10, 2)
-  roa           Decimal? @db.Decimal(10, 2)
-  roic          Decimal? @db.Decimal(10, 2)
-  grossMargin   Decimal? @db.Decimal(10, 2)
-  operatingMargin Decimal? @db.Decimal(10, 2)
-  netMargin     Decimal? @db.Decimal(10, 2)
-  
-  // Liquidity & Solvency
-  currentRatio  Decimal? @db.Decimal(10, 2)
-  quickRatio    Decimal? @db.Decimal(10, 2)
-  debtToEquity  Decimal? @db.Decimal(10, 2)
-  interestCoverage Decimal? @db.Decimal(10, 2)
-  
-  // Dividend
-  dividendYield Decimal? @db.Decimal(5, 2)
-  payoutRatio   Decimal? @db.Decimal(5, 2)
-  
-  // Growth (YoY)
-  revenueGrowth Decimal? @db.Decimal(10, 2)
-  epsGrowth     Decimal? @db.Decimal(10, 2)
-  
-  // Timestamp for this snapshot
-  asOfDate      DateTime @default(now())
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([companyId, asOfDate])
-  @@index([peRatio])
-  @@index([dividendYield])
-}
-
-// ============================================
-// REPORTS & DOCUMENTS
-// ============================================
-
-model CompanyReport {
-  id            String   @id @default(cuid())
-  
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  title         String
-  reportType    String
-  fiscalYear    Int?
-  publishDate   DateTime
-  
-  // File info
-  fileUrl       String?
-  fileName      String?
-  fileSize      Int?
-  
-  // AI Processing
-  summary       String?  @db.Text
-  keyPoints     String[]
-  sentiment     String?
-  aiProcessed   Boolean  @default(false)
-  
-  // Access
-  savedBy       SavedReport[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@unique([companyId, title])  // ADD THIS LINE
-  @@index([companyId, publishDate])
-  @@index([reportType])
-}
-
-model SavedReport {
-  id            String   @id @default(cuid())
-  
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  reportId      String
-  report        CompanyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  
-  notes         String?  @db.Text
-  
-  createdAt     DateTime @default(now())
-  
-  @@unique([userId, reportId])
-  @@index([userId])
-}
-
-// ============================================
-// WATCHLISTS
-// ============================================
-
-model Watchlist {
-  id            String   @id @default(cuid())
-  
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  name          String   @default("My Watchlist")
-  description   String?
-  isDefault     Boolean  @default(false)
-  
-  items         WatchlistItem[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([userId])
-}
-
-model WatchlistItem {
-  id            String   @id @default(cuid())
-  
-  watchlistId   String
-  watchlist     Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
-  
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  // User notes/targets
-  targetPrice   Decimal? @db.Decimal(10, 2)
-  notes         String?  @db.Text
-  
-  addedAt       DateTime @default(now())
-  
-  @@unique([watchlistId, companyId])
-  @@index([watchlistId])
-  @@index([companyId])
-}
-
-// ============================================
-// ALERTS & NOTIFICATIONS
-// ============================================
-
 enum AlertType {
   PRICE_ABOVE
   PRICE_BELOW
@@ -420,119 +403,8 @@ enum AlertType {
   EARNINGS_DATE
 }
 
-model Alert {
-  id            String   @id @default(cuid())
-  
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  companyId     String?
-  
-  type          AlertType
-  threshold     Decimal? @db.Decimal(10, 2)
-  message       String?
-  
-  isActive      Boolean  @default(true)
-  triggered     Boolean  @default(false)
-  triggeredAt   DateTime?
-  
-  createdAt     DateTime @default(now())
-  
-  @@index([userId, isActive])
-  @@index([companyId])
-}
-
-// ============================================
-// AI & SENTIMENT ANALYSIS
-// ============================================
-
-model SentimentAnalysis {
-  id            String   @id @default(cuid())
-  
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  source        String
-  sourceUrl     String?
-  
-  sentiment     String
-  score         Decimal  @db.Decimal(5, 2)
-  
-  summary       String?  @db.Text
-  keywords      String[]
-  
-  analyzedAt    DateTime @default(now())
-  
-  @@index([companyId, analyzedAt])
-  @@index([sentiment])
-}
-
-model NewsArticle {
-  id            String   @id @default(cuid())
-  
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  title         String
-  summary       String?  @db.Text
-  url           String
-  source        String
-  
-  publishedAt   DateTime
-  scrapedAt     DateTime @default(now())
-  
-  @@index([companyId, publishedAt])
-}
-
-// ============================================
-// API ACCESS (Enterprise)
-// ============================================
-
-model ApiKey {
-  id            String   @id @default(cuid())
-  
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  key           String   @unique
-  name          String
-  
-  // Limits
-  requestsPerDay Int     @default(1000)
-  requestsUsedToday Int  @default(0)
-  lastResetAt   DateTime @default(now())
-  
-  isActive      Boolean  @default(true)
-  
-  createdAt     DateTime @default(now())
-  expiresAt     DateTime?
-  
-  @@index([userId])
-  @@index([key])
-}
-
-// ============================================
-// SCRAPER METADATA
-// ============================================
-
-model ScraperJob {
-  id            String   @id @default(cuid())
-  
-  jobType       String
-  targetUrl     String
-  
-  status        String
-  attempts      Int      @default(0)
-  
-  companyId     String?
-  
-  errorMessage  String?  @db.Text
-  
-  startedAt     DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime @default(now())
-  
-  @@index([status])
-  @@index([jobType])
-  @@index([createdAt])
+enum StatementType {
+  ANNUAL
+  INTERIM
+  QUARTERLY
 }
